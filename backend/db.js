@@ -27,3 +27,6 @@ const connectWithRetry = async () => {
 const dbPromise = connectWithRetry();
 
 module.exports = dbPromise;
+
+
+// docker exec -it greenhouse_db mysql -u root -p    

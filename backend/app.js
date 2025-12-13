@@ -31,19 +31,11 @@ const usersRoutes = require('./routes/users');
 const controllersRoutes = require('./routes/greenhouse_controllers');
 const sensorNodesRoutes = require('./routes/sensor_nodes');
 const logsRoutes = require('./routes/htl_logs');
-const fansRoutes = require('./routes/fans');
-const actuatorsRoutes = require('./routes/actuators');
-const heatersRoutes = require('./routes/heaters');
-const wateringPumpsRoutes = require('./routes/watering_pumps');
 
 app.use('/users', usersRoutes);
 app.use('/greenhouse-controllers', controllersRoutes);
 app.use('/sensor-nodes', sensorNodesRoutes);
 app.use('/htl-logs', logsRoutes);
-app.use('/fans', fansRoutes);
-app.use('/actuators', actuatorsRoutes);
-app.use('/heaters', heatersRoutes);
-app.use('/watering-pumps', wateringPumpsRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running! Use /htl-logs for logs.' });
