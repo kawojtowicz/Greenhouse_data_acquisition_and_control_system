@@ -1,3 +1,6 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
 name: Build and deploy Node.js app to Azure Web App - greenhouse
 
 on:
@@ -10,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: read #This is required for actions/checkout
 
     steps:
       - uses: actions/checkout@v4
@@ -25,20 +28,19 @@ jobs:
           npm install
           npm run build --if-present
           npm run test --if-present
-        working-directory: backend   # 👈 Tutaj wskazujemy katalog z package.json
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: backend   # 👈 Wgrywamy tylko katalog backend
+          path: .
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
     permissions:
-      id-token: write
-      contents: read
+      id-token: write #This is required for requesting the JWT
+      contents: read #This is required for actions/checkout
 
     steps:
       - name: Download artifact from build job
@@ -49,9 +51,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_716DE6E650374CE5BB2E709E90188EC3 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_21CEBAA237E8415EAFFD2BC37609EFC5 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_32D7CA5B8B3D453B82B6C60C2C77CAB6 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C0AA26E0199A474CB9CDE1FAE1CD47B9 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_02CF78B5885744AEA8EA4B9492FC8116 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A059755897924470A650426393039575 }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
@@ -59,7 +61,5 @@ jobs:
         with:
           app-name: 'greenhouse'
           slot-name: 'Production'
-          package: backend   # 👈 Wskazujemy katalog backend jako paczkę do deploymentu
-
-
+          package: .
           
