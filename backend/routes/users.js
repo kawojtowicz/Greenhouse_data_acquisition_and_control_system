@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const dbPromise = require('../db');
+const jwt = require('jsonwebtoken');
 const { isUserAuthenticated } = require('../auth');
 
 
@@ -171,15 +172,14 @@ router.post(
     }
 
     try {
-      // 🔐 sprawdzamy czy sensor należy do zalogowanego usera
       const [rows] = await db.query(
         `
         SELECT sn.id_sensor_node
         FROM Sensor_nodes sn
-        JOIN Zones z ON sn.id_zone = z.id_zone
-        JOIN Greenhouse_controllers gc ON z.id_greenhouse_controller = gc.id_greenhouse_controller
+        LEFT JOIN Zones z ON sn.id_zone = z.id_zone
+        LEFT JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
         WHERE sn.id_sensor_node = ?
-          AND gc.id_user = ?
+          AND (g.id_user = ? OR sn.id_zone IS NULL)
         `,
         [id_sensor_node, req.session.user.id]
       );
@@ -261,7 +261,6 @@ router.get('/zones/:zoneId/devices', isUserAuthenticated, async (req, res) => {
   res.json(rows);
 });
 
-// Zmiana szklarni dla sensora
 router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) => {
   const { id_sensor_node, new_controller_id } = req.body;
   const db = await dbPromise;
@@ -271,7 +270,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
   }
 
   try {
-    // Sprawdzamy, czy sensor należy do użytkownika
     const [sensorRows] = await db.query(
       `SELECT sn.id_sensor_node
        FROM Sensor_nodes sn
@@ -286,7 +284,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
       return res.status(403).json({ message: 'Access denied: sensor not found or not owned by user' });
     }
 
-    // Sprawdzamy, czy nowa szklarnia należy do tego samego użytkownika
     const [controllerRows] = await db.query(
       'SELECT id_greenhouse_controller FROM Greenhouse_controllers WHERE id_greenhouse_controller = ? AND id_user = ?',
       [new_controller_id, req.session.user.id]
@@ -296,8 +293,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
       return res.status(403).json({ message: 'Access denied: controller not found or not owned by user' });
     }
 
-    // Aktualizacja sensora – zakładamy, że sensor ma przypisaną strefę (zone)
-    // Przenosimy go do pierwszej strefy nowej szklarni
     const [zoneRows] = await db.query(
       'SELECT id_zone FROM Zones WHERE id_greenhouse_controller = ? ORDER BY id_zone LIMIT 1',
       [new_controller_id]
@@ -326,62 +321,16 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
   }
 });
 
-// Pobieranie listy szklarni użytkownika
-router.get('/greenhouses', isUserAuthenticated, async (req, res) => {
-  try {
-    const userId = req.session.user.id;
-    const db = await dbPromise;
 
-    const [rows] = await db.query(
-      'SELECT id_greenhouse_controller, greenhouse_name FROM Greenhouse_controllers WHERE id_user = ?',
-      [userId]
-    );
-
-    res.json({ greenhouses: rows });
-  } catch (err) {
-    console.error('Error fetching user greenhouses:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-
-// Dodawanie nowej szklarni
-router.post('/greenhouses', isUserAuthenticated, async (req, res) => {
-  const { greenhouse_name, description } = req.body;
-
-  if (!greenhouse_name || greenhouse_name.trim() === '') {
-    return res.status(400).json({ message: 'Nazwa szklarni jest wymagana' });
-  }
-
-  try {
-    const db = await dbPromise;
-
-    // Tworzymy nową szklarnię w tabeli Greenhouses
-    const [result] = await db.query(
-      'INSERT INTO Greenhouses (greenhouse_name, description) VALUES (?, ?)',
-      [greenhouse_name, description || null]
-    );
-
-    res.status(201).json({
-      message: 'Szklarnia utworzona',
-      greenhouse: {
-        id_greenhouse: result.insertId,
-        greenhouse_name,
-        description: description || null
-      }
-    });
-  } catch (err) {
-    console.error('Error creating greenhouse:', err);
-    res.status(500).json({ message: 'Błąd serwera' });
-  }
-});
-
-
-// Pobieranie wszystkich stref użytkownika
 router.get('/zones', isUserAuthenticated, async (req, res) => {
   try {
     const userId = req.session.user.id;
+    const greenhouseId = req.query.greenhouse_id;
     const db = await dbPromise;
+
+    if (!greenhouseId) {
+      return res.status(400).json({ message: 'greenhouse_id required' });
+    }
 
     const [rows] = await db.query(`
       SELECT 
@@ -389,29 +338,32 @@ router.get('/zones', isUserAuthenticated, async (req, res) => {
         z.zone_name,
         z.id_greenhouse_controller,
         z.id_greenhouse,
+        z.x,
+        z.y,
+        z.width,
+        z.height,
         g.greenhouse_name
       FROM Zones z
-      JOIN Greenhouse_controllers gc ON z.id_greenhouse_controller = gc.id_greenhouse_controller
       JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
-      WHERE gc.id_user = ?
-      ORDER BY gc.id_greenhouse_controller, z.id_zone
-    `, [userId]);
+      WHERE z.id_greenhouse = ? AND g.id_user = ?
+      ORDER BY z.id_zone
+    `, [greenhouseId, userId]);
+
 
     res.json({ zones: rows });
   } catch (err) {
-    console.error('Error fetching user zones:', err);
+    console.error('Error fetching zones:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Pobieranie stref dla jednej szklarni/kontrolera
+
 router.get('/greenhouses/:controllerId/zones', isUserAuthenticated, async (req, res) => {
   const { controllerId } = req.params;
 
   try {
     const db = await dbPromise;
 
-    // Sprawdzenie czy kontroler należy do użytkownika
     const [checkController] = await db.query(
       'SELECT id_greenhouse_controller FROM Greenhouse_controllers WHERE id_greenhouse_controller = ? AND id_user = ?',
       [controllerId, req.session.user.id]
@@ -440,6 +392,584 @@ router.get('/greenhouses/:controllerId/zones', isUserAuthenticated, async (req, 
   }
 });
 
+router.get('/unassigned', isUserAuthenticated, async (req, res) => {
+  try {
+    const db = await dbPromise;
+    const [rows] = await db.query(
+      'SELECT device_id FROM Greenhouse_controllers WHERE id_user IS NULL'
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/assign', isUserAuthenticated, async (req, res) => {
+  const { device_id } = req.body;
+  if (!device_id) return res.status(400).json({ message: 'device_id required' });
+
+  try {
+    const db = await dbPromise;
+
+    const [rows] = await db.query(
+      'SELECT * FROM Greenhouse_controllers WHERE device_id = ? AND id_user IS NULL',
+      [device_id]
+    );
+
+    if (rows.length === 0) return res.status(400).json({ message: 'Device not available' });
+
+    await db.query(
+      'UPDATE Greenhouse_controllers SET id_user = ? WHERE device_id = ?',
+      [req.session.user.id, device_id]
+    );
+
+    const token = jwt.sign({ device_id, user_id: req.session.user.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    res.json({ message: 'Device assigned', token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+router.get('/sensors/unassigned', isUserAuthenticated, async (req, res) => {
+  try {
+    const db = await dbPromise;
+    const userId = req.session.user.id;
+
+    const [rows] = await db.query(`
+      SELECT
+        sn.id_sensor_node,
+        sn.sensor_node_name,
+        sn.id_greenhouse_controller
+      FROM Sensor_nodes sn
+      JOIN Greenhouse_controllers gc
+        ON gc.id_greenhouse_controller = sn.id_greenhouse_controller
+      WHERE sn.id_zone IS NULL
+        AND gc.id_user = ?
+      ORDER BY sn.id_sensor_node
+    `, [userId]);
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching unassigned sensors:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/greenhouses', isUserAuthenticated, async (req, res) => {
+  const { greenhouse_name, description } = req.body;
+
+  if (!greenhouse_name || greenhouse_name.trim() === '') {
+    return res.status(400).json({ message: 'Nazwa szklarni jest wymagana' });
+  }
+
+  try {
+    const db = await dbPromise;
+
+    const [result] = await db.query(
+      'INSERT INTO Greenhouses (greenhouse_name, description, id_user) VALUES (?, ?, ?)',
+      [greenhouse_name, description || null, req.session.user.id]
+    );
+
+    const [controllerResult] = await db.query(
+      'INSERT INTO Greenhouse_controllers (id_user) VALUES (?)',
+      [req.session.user.id]
+    );
+
+    res.status(201).json({
+      message: 'Szklarnia utworzona',
+      greenhouse: {
+        id_greenhouse: result.insertId,
+        greenhouse_name,
+        description: description || null,
+        id_user: req.session.user.id
+      },
+      controller: {
+        id_greenhouse_controller: controllerResult.insertId
+      }
+    });
+  } catch (err) {
+    console.error('Error creating greenhouse:', err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+router.get('/greenhouses', isUserAuthenticated, async (req, res) => {
+  try {
+    const db = await dbPromise;
+
+    const [greenhouses] = await db.query(
+      'SELECT * FROM Greenhouses WHERE id_user = ?',
+      [req.session.user.id]
+    );
+
+    res.json({ greenhouses });
+  } catch (err) {
+    console.error('Error fetching greenhouses:', err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+
+
+
+router.post('/sensors/assign-zone', isUserAuthenticated, async (req, res) => {
+  const { id_sensor_node, id_zone } = req.body;
+  const db = await dbPromise;
+
+  if (!id_sensor_node || !id_zone) {
+    return res.status(400).json({ message: 'id_sensor_node i id_zone wymagane' });
+  }
+
+  try {
+  
+    const [zoneRows] = await db.query(`
+      SELECT z.id_zone, z.x, z.y, z.width, z.height
+      FROM Zones z
+      JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE z.id_zone = ? AND g.id_user = ?
+    `, [id_zone, req.session.user.id]);
+
+    if (zoneRows.length === 0) {
+      return res.status(403).json({ message: 'Strefa nie należy do użytkownika' });
+    }
+
+    const zone = zoneRows[0];
+
+
+    const centerX = zone.x + zone.width / 2;
+    const centerY = zone.y + zone.height / 2;
+
+    
+    await db.query(
+      'UPDATE Sensor_nodes SET id_zone = ?, x = ?, y = ? WHERE id_sensor_node = ?',
+      [id_zone, Math.round(centerX), Math.round(centerY), id_sensor_node]
+    );
+
+    res.json({
+      message: 'Sensor przypisany do strefy i ustawiony w jej środku',
+      id_sensor_node,
+      id_zone,
+      x: Math.round(centerX),
+      y: Math.round(centerY)
+    });
+  } catch (err) {
+    console.error('Error assigning sensor to zone:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+router.post('/zones', isUserAuthenticated, async (req, res) => {
+  const { zone_name, greenhouse_id, x, y, width, height } = req.body;
+
+  if (!zone_name || !greenhouse_id) {
+    return res.status(400).json({ message: 'zone_name i greenhouse_id są wymagane' });
+  }
+
+  try {
+    const db = await dbPromise;
+
+    const [greenhouseRows] = await db.query(
+      'SELECT id_user FROM Greenhouses WHERE id_greenhouse = ?',
+      [greenhouse_id]
+    );
+
+    if (greenhouseRows.length === 0) {
+      return res.status(404).json({ message: 'Szklarnia nie istnieje' });
+    }
+
+    if (greenhouseRows[0].id_user !== req.session.user.id) {
+      return res.status(403).json({ message: 'Dostęp zabroniony: nie jesteś właścicielem szklarni' });
+    }
+
+
+    const [result] = await db.query(
+      `INSERT INTO Zones 
+       (zone_name, id_greenhouse, x, y, width, height, id_greenhouse_controller) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        zone_name,
+        greenhouse_id,
+        x ?? 50,
+        y ?? 50,
+        width ?? 50,
+        height ?? 50,
+        null
+      ]
+    );
+
+    res.status(201).json({
+      message: 'Strefa utworzona',
+      zone: {
+        id_zone: result.insertId,
+        zone_name,
+        id_greenhouse: greenhouse_id,
+        x: x ?? 50,
+        y: y ?? 50,
+        width: width ?? 50,
+        height: height ?? 50,
+        id_greenhouse_controller: null
+      }
+    });
+  } catch (err) {
+    console.error('Błąd tworzenia strefy:', err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+
+router.get('/zones/all', isUserAuthenticated, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const db = await dbPromise;
+
+    const [rows] = await db.query(`
+      SELECT 
+        z.id_zone,
+        z.zone_name,
+        z.id_greenhouse,
+        g.greenhouse_name
+      FROM Zones z
+      JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE g.id_user = ?
+      ORDER BY g.id_greenhouse, z.id_zone
+    `, [userId]);
+
+    res.json({ zones: rows });
+  } catch (err) {
+    console.error('Error fetching all user zones:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/:id/sensors/all', isUserAuthenticated, async (req, res) => {
+  const greenhouseId = req.params.id;
+  try {
+    const db = await dbPromise;
+
+    const [check] = await db.query(
+      `SELECT id_greenhouse
+       FROM Greenhouses
+       WHERE id_greenhouse = ? AND id_user = ?`,
+      [greenhouseId, req.session.user.id]
+    );
+
+    if (check.length === 0) return res.status(403).json({ message: 'Access denied' });
+
+    const [sensors] = await db.query(`
+      SELECT
+      sn.id_sensor_node,
+      sn.sensor_node_name,
+      sn.x,
+      sn.y,
+      (SELECT temperature
+      FROM htl_logs
+      WHERE id_sensor_node = sn.id_sensor_node
+      ORDER BY log_time DESC
+      LIMIT 1) AS temperature,
+      (SELECT humidity
+      FROM htl_logs
+      WHERE id_sensor_node = sn.id_sensor_node
+      ORDER BY log_time DESC
+      LIMIT 1) AS humidity,
+      (SELECT light
+      FROM htl_logs
+      WHERE id_sensor_node = sn.id_sensor_node
+      ORDER BY log_time DESC
+      LIMIT 1) AS light
+    FROM Sensor_nodes sn
+    JOIN Zones z ON sn.id_zone = z.id_zone
+    WHERE z.id_greenhouse = ?
+    ORDER BY sn.id_sensor_node
+
+    `, [greenhouseId]);
+
+    res.json(sensors);
+  } catch (err) {
+    console.error('Error fetching all sensors for greenhouse:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.delete('/zones/:zoneId', isUserAuthenticated, async (req, res) => {
+  const { zoneId } = req.params;
+  const db = await dbPromise;
+
+  try {
+    const [zoneRows] = await db.query(`
+      SELECT z.id_zone
+      FROM Zones z
+      JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE z.id_zone = ? AND g.id_user = ?
+    `, [zoneId, req.session.user.id]);
+
+    if (zoneRows.length === 0) {
+      return res.status(403).json({ message: 'Dostęp zabroniony: strefa nie należy do użytkownika' });
+    }
+
+  
+    await db.query(`
+      UPDATE Sensor_nodes
+      SET id_zone = NULL
+      WHERE id_zone = ?
+    `, [zoneId]);
+
+  
+    await db.query(`
+      UPDATE End_devices
+      SET id_zone = NULL
+      WHERE id_zone = ?
+    `, [zoneId]);
+
+  
+    await db.query(`
+      DELETE FROM Zones
+      WHERE id_zone = ?
+    `, [zoneId]);
+
+    res.json({ message: 'Strefa usunięta, powiązane sensory i urządzenia odpięte', id_zone: zoneId });
+  } catch (err) {
+    console.error('Error deleting zone:', err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+router.get('/:greenhouseId/end-devices', isUserAuthenticated, async (req, res) => {
+  const { greenhouseId } = req.params;
+  const db = await dbPromise;
+
+  try {
+    const [rows] = await db.query(`
+      SELECT *
+      FROM End_devices
+      WHERE id_zone IN (
+        SELECT id_zone FROM Zones WHERE id_greenhouse = ?
+      )
+    `, [greenhouseId]);
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/end-devices/position', isUserAuthenticated, async (req, res) => {
+  const { id_end_device, x, y } = req.body;
+  const db = await dbPromise;
+
+  if (!id_end_device || x === undefined || y === undefined) {
+    return res.status(400).json({ message: 'Missing id_end_device, x or y' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT ed.id_end_device
+      FROM End_devices ed
+      LEFT JOIN Zones z ON ed.id_zone = z.id_zone
+      LEFT JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE ed.id_end_device = ?
+        AND g.id_user = ?
+      `,
+      [id_end_device, req.session.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    await db.query(
+      `
+      UPDATE End_devices
+      SET x = ?, y = ?
+      WHERE id_end_device = ?
+      `,
+      [Math.round(x), Math.round(y), id_end_device]
+    );
+
+    res.json({
+      message: 'End device position saved',
+      id_end_device,
+      x,
+      y,
+    });
+  } catch (err) {
+    console.error('Error saving end device position:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/greenhouse/:id/controllers', isUserAuthenticated, async (req, res) => {
+  const greenhouseId = req.params.id;
+  const userId = req.session.user.id;
+  const db = await dbPromise;
+
+  const [rows] = await db.query(
+    `SELECT id_greenhouse_controller, device_id, device_token
+     FROM Greenhouse_controllers
+     WHERE id_user = ? AND is_active = 1`,
+    [userId]
+  );
+
+  res.json(rows);
+});
+
+router.post('/zones/:id/assign-controller', isUserAuthenticated, async (req, res) => {
+  const zoneId = req.params.id;
+  const { controller_id } = req.body;
+  const db = await dbPromise;
+
+  try {
+    await db.query(
+      `UPDATE Zones SET id_greenhouse_controller = ? WHERE id_zone = ?`,
+      [controller_id, zoneId]
+    );
+    res.status(200).json({ message: 'Strefa przypisana do kontrolera' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+router.get('/end-devices/unassigned', isUserAuthenticated, async (req, res) => {
+  try {
+    const db = await dbPromise;
+    const userId = req.session.user.id;
+
+    const [rows] = await db.query(`
+      SELECT
+        ed.id_end_device,
+        ed.end_device_name,
+        ed.id_greenhouse_controller
+      FROM End_devices ed
+      JOIN Greenhouse_controllers gc
+        ON gc.id_greenhouse_controller = ed.id_greenhouse_controller
+      WHERE ed.id_zone IS NULL
+        AND gc.id_user = ?
+      ORDER BY ed.id_end_device
+    `, [userId]);
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching unassigned end devices:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/end-devices/assign-zone', isUserAuthenticated, async (req, res) => {
+  const { id_end_device, id_zone } = req.body;
+  const db = await dbPromise;
+
+  if (!id_end_device || !id_zone) {
+    return res.status(400).json({ message: 'id_end_device i id_zone wymagane' });
+  }
+
+  try {
+    const [[zone]] = await db.query(`
+      SELECT 
+        z.id_zone,
+        z.x,
+        z.y,
+        z.width,
+        z.height
+      FROM Zones z
+      JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE z.id_zone = ? AND g.id_user = ?
+    `, [id_zone, req.session.user.id]);
+
+    if (!zone) {
+      return res.status(403).json({ message: 'Strefa nie należy do użytkownika' });
+    }
+
+    const deviceX = Math.round(zone.x + zone.width / 2);
+    const deviceY = Math.round(zone.y + zone.height / 2);
+
+    await db.query(`
+      UPDATE End_devices
+      SET 
+        id_zone = ?,
+        x = ?,
+        y = ?
+      WHERE id_end_device = ?
+    `, [id_zone, deviceX, deviceY, id_end_device]);
+
+    res.json({
+      message: 'End device przypisany do strefy',
+      id_end_device,
+      id_zone,
+      x: deviceX,
+      y: deviceY
+    });
+  } catch (err) {
+    console.error('Error assigning end device to zone:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/end-devices/update-params', isUserAuthenticated, async (req, res) => {
+  const {
+    id_end_device,
+    up_temp,
+    down_temp,
+    up_hum,
+    down_hum,
+    up_light,
+    down_light
+  } = req.body;
+
+  const db = await dbPromise;
+
+  if (!id_end_device) {
+    return res.status(400).json({ message: 'id_end_device required' });
+  }
+
+  try {
+   
+    const [rows] = await db.query(`
+      SELECT ed.id_end_device
+      FROM End_devices ed
+      JOIN Zones z ON ed.id_zone = z.id_zone
+      JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE ed.id_end_device = ?
+        AND g.id_user = ?
+    `, [id_end_device, req.session.user.id]);
+
+    if (rows.length === 0) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    await db.query(`
+      UPDATE End_devices
+      SET
+        up_temp = ?,
+        down_temp = ?,
+        up_hum = ?,
+        down_hum = ?,
+        up_light = ?,
+        down_light = ?
+      WHERE id_end_device = ?
+    `, [
+      up_temp ?? null,
+      down_temp ?? null,
+      up_hum ?? null,
+      down_hum ?? null,
+      up_light ?? null,
+      down_light ?? null,
+      id_end_device
+    ]);
+
+    res.json({ message: 'End device parameters updated' });
+  } catch (err) {
+    console.error('Error updating end device params:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 
 module.exports = router;

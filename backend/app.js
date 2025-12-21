@@ -31,11 +31,13 @@ const usersRoutes = require('./routes/users');
 const controllersRoutes = require('./routes/greenhouse_controllers');
 const sensorNodesRoutes = require('./routes/sensor_nodes');
 const logsRoutes = require('./routes/htl_logs');
+const devicesRoutes = require('./routes/devices');
 
 app.use('/users', usersRoutes);
 app.use('/greenhouse-controllers', controllersRoutes);
 app.use('/sensor-nodes', sensorNodesRoutes);
 app.use('/htl-logs', logsRoutes);
+app.use('/devices', devicesRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running! Use /htl-logs for logs.' });

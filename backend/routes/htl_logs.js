@@ -13,179 +13,103 @@ router.get('/', async (req, res) => {
   }
 });
 
-// router.post('/', async (req, res) => {
-//   const { temperature, humidity, light, id_sensor_node, id_controller } = req.body;
-//   const db = await dbPromise;
 
-//   if (!temperature || !humidity || !light || !id_sensor_node || !id_controller) {
-//     return res.status(400).json({ error: "Missing required fields" });
-//   }
-
-//   try {
-//     await db.query('START TRANSACTION');
-
-//     const [controllerExisting] = await db.query(
-//       'SELECT id_greenhouse_controller FROM Greenhouse_controllers WHERE id_greenhouse_controller = ?',
-//       [id_controller]
-//     );
-
-//     let createdController = false;
-//     if (controllerExisting.length === 0) {
-//       await db.query(
-//         'INSERT INTO Greenhouse_controllers (id_greenhouse_controller, greenhouse_name, id_user) VALUES (?, ?, ?)',
-//         [id_controller, `AutoController_${id_controller}`, 1]
-//       );
-//       createdController = true;
-//     }
-
-//     const [sensorExisting] = await db.query(
-//       'SELECT id_sensor_node FROM Sensor_nodes WHERE id_sensor_node = ?',
-//       [id_sensor_node]
-//     );
-
-//     let createdSensorNode = false;
-//     if (sensorExisting.length === 0) {
-//       await db.query(
-//         'INSERT INTO Sensor_nodes (id_sensor_node, sensor_node_name, id_greenhouse_controller) VALUES (?, ?, ?)',
-//         [id_sensor_node, `AutoNode_${id_sensor_node}`, id_controller]
-//       );
-//       createdSensorNode = true;
-//     }
-
-//     const log_time = new Date().toISOString().slice(0, 19).replace('T', ' ');
-//     const [result] = await db.query(
-//       'INSERT INTO htl_logs (temperature, humidity, light, id_sensor_node, log_time) VALUES (?, ?, ?, ?, ?)',
-//       [temperature, humidity, light, id_sensor_node, log_time]
-//     );
-
-//     await db.query('COMMIT');
-
-//     res.json({
-//       id_log: result.insertId,
-//       temperature,
-//       humidity,
-//       light,
-//       id_sensor_node,
-//       id_controller,
-//       log_time,
-//       controller_created: createdController,
-//       sensor_node_created: createdSensorNode
-//     });
-
-//   } catch (err) {
-//     await db.query('ROLLBACK');
-//     console.error('Error adding log:', err);
-//     res.status(500).json({ error: err.message });
-//   }
-// });
 router.post('/', async (req, res) => {
-  const { temperature, humidity, light, id_sensor_node, id_controller } = req.body;
+  const { temperature, humidity, light, id_sensor_node, device_id, node_type } = req.body;
   const db = await dbPromise;
 
-  if (
-    temperature === undefined ||
-    humidity === undefined ||
-    light === undefined ||
-    !id_sensor_node ||
-    !id_controller
-  ) {
+  if (node_type === undefined || !id_sensor_node || !device_id) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
     await db.query('START TRANSACTION');
 
-    // 1️⃣ Controller
-    const [[controller]] = await db.query(
-      'SELECT id_greenhouse_controller FROM Greenhouse_controllers WHERE id_greenhouse_controller = ?',
-      [id_controller]
+    const [controllerRows] = await db.query(
+      'SELECT id_greenhouse_controller FROM Greenhouse_controllers WHERE device_id = ?',
+      [device_id]
     );
 
-    if (!controller) {
-      await db.query(
-        'INSERT INTO Greenhouse_controllers (id_greenhouse_controller, id_user) VALUES (?, ?)',
-        [id_controller, 1] // domyślny user (np. admin / system)
+    let controllerId;
+    if (controllerRows.length === 0) {
+      const [cRes] = await db.query(
+        'INSERT INTO Greenhouse_controllers (device_id) VALUES (?)',
+        [device_id]
       );
-    }
-
-    // 2️⃣ Greenhouse
-    const [[greenhouse]] = await db.query(
-      'SELECT id_greenhouse FROM Greenhouses WHERE greenhouse_name = ?',
-      [`AutoGreenhouse_${id_controller}`]
-    );
-
-    let greenhouseId;
-    if (!greenhouse) {
-      const [gRes] = await db.query(
-        'INSERT INTO Greenhouses (greenhouse_name, description) VALUES (?, ?)',
-        [`AutoGreenhouse_${id_controller}`, 'Auto-created from IoT']
-      );
-      greenhouseId = gRes.insertId;
+      controllerId = cRes.insertId;
     } else {
-      greenhouseId = greenhouse.id_greenhouse;
+      controllerId = controllerRows[0].id_greenhouse_controller;
     }
 
-    // 3️⃣ Zone
-    const [[zone]] = await db.query(
-      'SELECT id_zone FROM Zones WHERE id_greenhouse_controller = ? AND id_greenhouse = ?',
-      [id_controller, greenhouseId]
-    );
+    if (node_type === 1) {
+      if (temperature === undefined || humidity === undefined || light === undefined) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({ error: 'Missing sensor data' });
+      }
 
-    let zoneId;
-    if (!zone) {
-      const [zRes] = await db.query(
-        `INSERT INTO Zones (
-          zone_name, id_greenhouse_controller, id_greenhouse
-        ) VALUES (?, ?, ?)`,
-        ['AutoZone', id_controller, greenhouseId]
+      const [sensorRows] = await db.query(
+        'SELECT id_sensor_node FROM Sensor_nodes WHERE id_sensor_node = ?',
+        [id_sensor_node]
       );
-      zoneId = zRes.insertId;
-    } else {
-      zoneId = zone.id_zone;
-    }
 
-    // 4️⃣ Sensor node
-    const [[sensor]] = await db.query(
-      'SELECT id_sensor_node FROM Sensor_nodes WHERE id_sensor_node = ?',
-      [id_sensor_node]
-    );
+      const sensorExists = sensorRows.length > 0;
 
-    if (!sensor) {
-      await db.query(
-        `INSERT INTO Sensor_nodes (
-          id_sensor_node, sensor_node_name, id_zone
-        ) VALUES (?, ?, ?)`,
-        [id_sensor_node, `AutoNode_${id_sensor_node}`, zoneId]
+      if (!sensorExists) {
+        await db.query(
+          'INSERT INTO Sensor_nodes (id_sensor_node, sensor_node_name, id_greenhouse_controller) VALUES (?, ?, ?)',
+          [id_sensor_node, `AutoNode_${id_sensor_node}`, controllerId]
+        );
+      }
+
+      const [logRes] = await db.query(
+        'INSERT INTO htl_logs (temperature, humidity, light, id_sensor_node) VALUES (?, ?, ?, ?)',
+        [temperature, humidity, light, id_sensor_node]
       );
+
+      await db.query('COMMIT');
+
+      return res.json({
+        type: 'sensor',
+        id_log: logRes.insertId,
+        id_sensor_node,
+        controllerId,
+        sensor_auto_created: !sensorExists
+      });
     }
 
-    // 5️⃣ Log
-    const [logRes] = await db.query(
-      `INSERT INTO htl_logs (
-        temperature, humidity, light, id_sensor_node
-      ) VALUES (?, ?, ?, ?)`,
-      [temperature, humidity, light, id_sensor_node]
-    );
+    if (node_type === 0) {
+      const [endDeviceRows] = await db.query(
+        'SELECT id_end_device FROM End_devices WHERE id_end_device = ?',
+        [id_sensor_node]
+      );
 
-    await db.query('COMMIT');
+      const endDeviceExists = endDeviceRows.length > 0;
 
-    res.json({
-      id_log: logRes.insertId,
-      temperature,
-      humidity,
-      light,
-      id_sensor_node,
-      id_controller,
-      zone_id: zoneId,
-      greenhouse_id: greenhouseId,
-      auto_created: true
-    });
+      if (!endDeviceExists) {
+        await db.query(
+          'INSERT INTO End_devices (id_end_device, end_device_name, id_zone, id_greenhouse_controller) VALUES (?, ?, NULL, ?)',
+          [id_sensor_node, `EndDevice_${id_sensor_node}`, controllerId]
+        );
+      }
+
+      await db.query('COMMIT');
+
+      return res.json({
+        type: 'end_device',
+        id_end_device: id_sensor_node,
+        auto_created: !endDeviceExists
+      });
+    }
+
+    await db.query('ROLLBACK');
+    res.status(400).json({ error: 'Invalid node_type' });
 
   } catch (err) {
     await db.query('ROLLBACK');
-    console.error('Error adding log:', err);
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 module.exports = router;
