@@ -17,15 +17,17 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   let { temperature, humidity, light, id_sensor_node, device_id, node_type } = req.body;
 
-  if (node_type === undefined || !device_id) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  node_type = Number(node_type);
+  if (![0,1].includes(node_type)) {
+    return res.status(400).json({ error: 'Invalid or missing node_type' });
   }
 
-  if (!id_sensor_node || id_sensor_node.trim() === '') {
+
+  if (id_sensor_node === undefined || id_sensor_node === null) {
     return res.status(400).json({ error: 'Missing id_sensor_node' });
   }
 
-  const id_sensor_node_num = BigInt(id_sensor_node);
+  const id_sensor_node_num = BigInt(id_sensor_node.toString());
 
   const client = await db.connect();
 
