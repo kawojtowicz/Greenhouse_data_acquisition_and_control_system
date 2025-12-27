@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const dbPromise = require('../db');
+const db = require('../db'); // pg Pool
 
 router.get('/', async (req, res) => {
   try {
-    const db = await dbPromise;
-    const [rows] = await db.query('SELECT * FROM htl_logs');
+    const { rows } = await db.query('SELECT * FROM htl_logs');
     res.json(rows);
   } catch (err) {
     console.error('Error fetching htl_logs:', err);
@@ -13,64 +12,64 @@ router.get('/', async (req, res) => {
   }
 });
 
-
 router.post('/', async (req, res) => {
   const { temperature, humidity, light, id_sensor_node, device_id, node_type } = req.body;
-  const db = await dbPromise;
 
   if (node_type === undefined || !id_sensor_node || !device_id) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  try {
-    await db.query('START TRANSACTION');
+  const client = await db.connect();
 
-    const [controllerRows] = await db.query(
-      'SELECT id_greenhouse_controller FROM Greenhouse_controllers WHERE device_id = ?',
+  try {
+    await client.query('BEGIN');
+
+    // Get or create controller
+    const { rows: controllerRows } = await client.query(
+      'SELECT id_greenhouse_controller FROM Greenhouse_controllers WHERE device_id = $1',
       [device_id]
     );
 
     let controllerId;
     if (controllerRows.length === 0) {
-      const [cRes] = await db.query(
-        'INSERT INTO Greenhouse_controllers (device_id) VALUES (?)',
+      const { rows: cRows } = await client.query(
+        'INSERT INTO Greenhouse_controllers (device_id) VALUES ($1) RETURNING id_greenhouse_controller',
         [device_id]
       );
-      controllerId = cRes.insertId;
+      controllerId = cRows[0].id_greenhouse_controller;
     } else {
       controllerId = controllerRows[0].id_greenhouse_controller;
     }
 
     if (node_type === 1) {
       if (temperature === undefined || humidity === undefined || light === undefined) {
-        await db.query('ROLLBACK');
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Missing sensor data' });
       }
 
-      const [sensorRows] = await db.query(
-        'SELECT id_sensor_node FROM Sensor_nodes WHERE id_sensor_node = ?',
+      const { rows: sensorRows } = await client.query(
+        'SELECT id_sensor_node FROM Sensor_nodes WHERE id_sensor_node = $1',
         [id_sensor_node]
       );
-
       const sensorExists = sensorRows.length > 0;
 
       if (!sensorExists) {
-        await db.query(
-          'INSERT INTO Sensor_nodes (id_sensor_node, sensor_node_name, id_greenhouse_controller) VALUES (?, ?, ?)',
+        await client.query(
+          'INSERT INTO Sensor_nodes (id_sensor_node, sensor_node_name, id_greenhouse_controller) VALUES ($1, $2, $3)',
           [id_sensor_node, `AutoNode_${id_sensor_node}`, controllerId]
         );
       }
 
-      const [logRes] = await db.query(
-        'INSERT INTO htl_logs (temperature, humidity, light, id_sensor_node) VALUES (?, ?, ?, ?)',
+      const { rows: logRows } = await client.query(
+        'INSERT INTO htl_logs (temperature, humidity, light, id_sensor_node) VALUES ($1, $2, $3, $4) RETURNING id_htl_log',
         [temperature, humidity, light, id_sensor_node]
       );
 
-      await db.query('COMMIT');
+      await client.query('COMMIT');
 
       return res.json({
         type: 'sensor',
-        id_log: logRes.insertId,
+        id_htl_log: logRows[0].id_htl_log,
         id_sensor_node,
         controllerId,
         sensor_auto_created: !sensorExists
@@ -78,21 +77,20 @@ router.post('/', async (req, res) => {
     }
 
     if (node_type === 0) {
-      const [endDeviceRows] = await db.query(
-        'SELECT id_end_device FROM End_devices WHERE id_end_device = ?',
+      const { rows: endDeviceRows } = await client.query(
+        'SELECT id_end_device FROM End_devices WHERE id_end_device = $1',
         [id_sensor_node]
       );
-
       const endDeviceExists = endDeviceRows.length > 0;
 
       if (!endDeviceExists) {
-        await db.query(
-          'INSERT INTO End_devices (id_end_device, end_device_name, id_zone, id_greenhouse_controller) VALUES (?, ?, NULL, ?)',
+        await client.query(
+          'INSERT INTO End_devices (id_end_device, end_device_name, id_zone, id_greenhouse_controller) VALUES ($1, $2, NULL, $3)',
           [id_sensor_node, `EndDevice_${id_sensor_node}`, controllerId]
         );
       }
 
-      await db.query('COMMIT');
+      await client.query('COMMIT');
 
       return res.json({
         type: 'end_device',
@@ -101,15 +99,15 @@ router.post('/', async (req, res) => {
       });
     }
 
-    await db.query('ROLLBACK');
+    await client.query('ROLLBACK');
     res.status(400).json({ error: 'Invalid node_type' });
-
   } catch (err) {
-    await db.query('ROLLBACK');
+    await client.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 });
-
 
 module.exports = router;

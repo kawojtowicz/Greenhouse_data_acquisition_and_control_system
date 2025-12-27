@@ -1,12 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const dbPromise = require('../db');
-
+const db = require('../db'); // pg Pool
 
 router.get('/', async (req, res) => {
   try {
-    const db = await dbPromise;
-    const [rows] = await db.query('SELECT * FROM Greenhouse_controllers');
+    const { rows } = await db.query('SELECT * FROM Greenhouse_controllers');
     res.json(rows);
   } catch (err) {
     console.error('Error fetching controllers:', err);
@@ -14,19 +12,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-
 router.post('/', async (req, res) => {
   try {
     const { greenhouse_name, id_user } = req.body;
-    const db = await dbPromise;
 
-    const [result] = await db.query(
-      'INSERT INTO Greenhouse_controllers (greenhouse_name, id_user) VALUES (?, ?)',
+    const { rows } = await db.query(
+      'INSERT INTO Greenhouse_controllers (greenhouse_name, id_user) VALUES ($1, $2) RETURNING id_greenhouse_controller',
       [greenhouse_name, id_user]
     );
 
     res.json({
-      id: result.insertId,
+      id: rows[0].id_greenhouse_controller,
       greenhouse_name,
       id_user
     });

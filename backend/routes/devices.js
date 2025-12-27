@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const dbPromise = require('../db');
+const db = require('../db');
 const jwt = require('jsonwebtoken');
 const { authenticateDevice } = require('../auth');
 
@@ -10,17 +10,14 @@ router.post('/', async (req, res) => {
   if (!device_id) return res.status(400).json({ message: 'device_id required' });
 
   try {
-    const db = await dbPromise;
-
-    const [existing] = await db.query(
-      'SELECT * FROM Greenhouse_controllers WHERE device_id = ?',
+    const { rows: existing } = await db.query(
+      'SELECT * FROM Greenhouse_controllers WHERE device_id = $1',
       [device_id]
     );
 
     if (existing.length === 0) {
-      
       await db.query(
-        'INSERT INTO Greenhouse_controllers (device_id, id_user) VALUES (?, NULL)',
+        'INSERT INTO Greenhouse_controllers (device_id, id_user) VALUES ($1, NULL)',
         [device_id]
       );
     }
@@ -32,19 +29,16 @@ router.post('/', async (req, res) => {
   }
 });
 
-
 router.get('/zones/full', authenticateDevice, async (req, res) => {
   try {
-    const db = await dbPromise;
-
     const deviceId = req.device.device_id;
 
-    const [zones] = await db.query(
+    const { rows: zones } = await db.query(
       `SELECT z.id_zone
        FROM Zones z
        JOIN Greenhouse_controllers gc
          ON z.id_greenhouse_controller = gc.id_greenhouse_controller
-       WHERE gc.device_id = ?`,
+       WHERE gc.device_id = $1`,
       [deviceId]
     );
 
@@ -53,21 +47,21 @@ router.get('/zones/full', authenticateDevice, async (req, res) => {
     for (const z of zones) {
       const zoneId = z.id_zone;
 
-      const [sensors] = await db.query(
+      const { rows: sensors } = await db.query(
         `SELECT 
-            l.id_sensor_node AS sensorNodeID,
-            l.temperature    AS tmpCelsius,
-            l.humidity       AS humRH,
-            l.light          AS lightLux
+            l.id_sensor_node AS "sensorNodeID",
+            l.temperature    AS "tmpCelsius",
+            l.humidity       AS "humRH",
+            l.light          AS "lightLux"
          FROM htl_logs l
          JOIN Sensor_nodes sn ON sn.id_sensor_node = l.id_sensor_node
-         WHERE sn.id_zone = ?
+         WHERE sn.id_zone = $1
          ORDER BY l.log_time DESC
          LIMIT 1`,
         [zoneId]
       );
 
-      const [endDevices] = await db.query(
+      const { rows: endDevices } = await db.query(
         `SELECT 
             id_end_device,
             up_temp, down_temp,
@@ -75,7 +69,7 @@ router.get('/zones/full', authenticateDevice, async (req, res) => {
             up_light, down_light,
             end_device_state
          FROM End_devices
-         WHERE id_zone = ?`,
+         WHERE id_zone = $1`,
         [zoneId]
       );
 

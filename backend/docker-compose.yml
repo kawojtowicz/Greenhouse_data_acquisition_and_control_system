@@ -1,25 +1,28 @@
+version: '3.8'
 
 services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: greenhouse
+    ports:
+      - "5432:5432"
+    networks:
+      - backend_network
+
   api:
     build: .
-    container_name: greenhouse_api
-    env_file: .env
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     depends_on:
-      - database
+      - db
+    networks:
+      - backend_network
 
-  database:
-    image: mysql:8.0
-    container_name: greenhouse_db
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: greenhouse_data_base
-    volumes:
-      - db_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
-
-volumes:
-  db_data:
+networks:
+  backend_network:
+    driver: bridge

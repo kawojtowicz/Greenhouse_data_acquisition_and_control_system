@@ -1,12 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const dbPromise = require('../db');
-
+const db = require('../db'); // pg Pool
 
 router.get('/', async (req, res) => {
   try {
-    const db = await dbPromise;
-    const [rows] = await db.query('SELECT * FROM Sensor_nodes');
+    const { rows } = await db.query('SELECT * FROM Sensor_nodes');
     res.json(rows);
   } catch (err) {
     console.error('Error fetching sensor nodes:', err);
@@ -14,19 +12,19 @@ router.get('/', async (req, res) => {
   }
 });
 
-
 router.post('/', async (req, res) => {
   try {
     const { sensor_node_name, id_greenhouse_controller } = req.body;
-    const db = await dbPromise;
 
-    const [result] = await db.query(
-      'INSERT INTO Sensor_nodes (sensor_node_name, id_greenhouse_controller) VALUES (?, ?)',
+    const { rows } = await db.query(
+      `INSERT INTO Sensor_nodes (sensor_node_name, id_greenhouse_controller)
+       VALUES ($1, $2)
+       RETURNING id_sensor_node`,
       [sensor_node_name, id_greenhouse_controller]
     );
 
     res.json({
-      id: result.insertId,
+      id: rows[0].id_sensor_node,
       sensor_node_name,
       id_greenhouse_controller
     });

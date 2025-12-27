@@ -5,6 +5,9 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET;
 
+function authenticateUser(req, id, username, firstName, lastName, email) {
+    req.session.user = { id, username, firstName, lastName, email };
+}
 
 function isUserAuthenticated(req, res, next) {
     if (req.session && req.session.user) {
@@ -12,10 +15,6 @@ function isUserAuthenticated(req, res, next) {
     } else {
         res.status(401).json({ message: 'Access denied. Please log in.' });
     }
-}
-
-function authenticateUser(req, id, username, firstName, lastName, email) {
-    req.session.user = { id, username, firstName, lastName, email };
 }
 
 async function authenticateDevice(req, res, next) {
@@ -28,8 +27,8 @@ async function authenticateDevice(req, res, next) {
   try {
     const db = await dbPromise;
 
-    const [rows] = await db.query(
-      'SELECT * FROM Greenhouse_controllers WHERE device_token = ?',
+    const { rows } = await db.query(
+      'SELECT * FROM Greenhouse_controllers WHERE device_token = $1',
       [token]
     );
 
@@ -42,7 +41,6 @@ async function authenticateDevice(req, res, next) {
     return res.status(403).json({ message: 'Invalid token' });
   }
 }
-
 
 
 module.exports = { isUserAuthenticated, authenticateUser, authenticateDevice };
