@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test API Users</title>
+</head>
+<body>
+  <h2>Test Users API</h2>
+
+  <h3>Rejestracja</h3>
+  <input id="regName" placeholder="Imię"><br>
+  <input id="regLastName" placeholder="Nazwisko"><br>
+  <input id="regEmail" placeholder="Email"><br>
+  <input id="regPassword" type="password" placeholder="Hasło"><br>
+  <button onclick="registerUser()">Zarejestruj</button>
+
+  <h3>Logowanie</h3>
+  <input id="loginEmail" placeholder="Email"><br>
+  <input id="loginPassword" type="password" placeholder="Hasło"><br>
+  <button onclick="loginUser()">Zaloguj</button>
+
+  <h3>Pobierz użytkowników</h3>
+  <button onclick="fetchUsers()">Pobierz Users</button>
+
+  <script>
+    const baseUrl = 'http://192.168.1.38:3000/users';
+
+    async function registerUser() {
+      const body = {
+        name: document.getElementById('regName').value,
+        lastName: document.getElementById('regLastName').value,
+        email: document.getElementById('regEmail').value,
+        password: document.getElementById('regPassword').value
+      };
+
+      const response = await fetch(`${baseUrl}/`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+      console.log('Register response:', data);
+      alert(JSON.stringify(data));
+    }
+
+    async function loginUser() {
+      const body = {
+        email: document.getElementById('loginEmail').value,
+        password: document.getElementById('loginPassword').value
+      };
+
+      const response = await fetch(`${baseUrl}/login`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json().catch(() => ({}));
+      console.log('Login response:', data);
+
+      if (response.status === 200) {
+        alert('Zalogowano pomyślnie');
+      } else {
+        alert('Błąd logowania: ' + JSON.stringify(data));
+      }
+    }
+
+    async function fetchUsers() {
+      const response = await fetch(baseUrl);
+      const data = await response.json();
+      console.log('Users:', data);
+      alert(JSON.stringify(data));
+    }
+  </script>
+</body>
+</html>
