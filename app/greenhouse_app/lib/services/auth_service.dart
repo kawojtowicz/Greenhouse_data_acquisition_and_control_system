@@ -5,27 +5,32 @@ import '../models/user.dart';
 
 class AuthService {
   final Dio dio;
+  final String baseUrl;
 
-  AuthService(this.dio);
+  AuthService(
+    this.dio, {
+    this.baseUrl =
+        'https://greenhouse-data-acquisition-and-control.onrender.com',
+  });
 
   Future<User?> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
-      throw Exception('Wprowadź adres e-mail użytkownika i hasło');
+      throw Exception('Podaj email i hasło');
     }
 
-    final loginResponse = await dio.post(
-      'http://192.168.0.101:3000/users/login',
-      data: jsonEncode({'email': email, 'password': password}),
-      options: Options(headers: {'Content-Type': 'application/json'}),
-    );
-
-    if (loginResponse.statusCode == 200) {
-      final userResponse = await dio.get(
-        'http://192.168.0.101:3000/users',
+    try {
+      final loginResponse = await dio.post(
+        '$baseUrl/users/login',
+        data: {'email': email, 'password': password},
         options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
-      if (userResponse.statusCode == 200) {
+      if (loginResponse.statusCode == 200) {
+        final userResponse = await dio.get(
+          '$baseUrl/users',
+          options: Options(headers: {'Content-Type': 'application/json'}),
+        );
+
         final userData = userResponse.data;
 
         final prefs = await SharedPreferences.getInstance();
@@ -40,11 +45,21 @@ class AuthService {
           name: userData['name'],
           lastName: userData['lastName'],
         );
-      } else {
-        throw Exception('Błąd podczas pobierania danych użytkownika');
       }
-    } else {
-      throw Exception('Niepoprawne dane logowania');
+
+      return null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('Błędne hasło');
+      }
+      if (e.response?.statusCode == 404) {
+        throw Exception('Użytkownik nie istnieje');
+      }
+      if (e.type == DioExceptionType.connectionTimeout) {
+        throw Exception('Brak połączenia z serwerem');
+      }
+
+      throw Exception('Błąd logowania');
     }
   }
 
@@ -55,7 +70,7 @@ class AuthService {
     required String lastName,
   }) async {
     final response = await dio.post(
-      'http://192.168.0.101:3000/users',
+      '$baseUrl/users',
       data: jsonEncode({
         'email': email,
         'password': password,

@@ -35,20 +35,27 @@ class _AuthPageState extends State<AuthPage> {
 
   void login() async {
     setState(() => loading = true);
-    final user = await _authService.login(
-      emailController.text,
-      passwordController.text,
-    );
 
-    if (user != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
+    try {
+      final user = await _authService.login(
+        emailController.text,
+        passwordController.text,
       );
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Błędne dane logowania')));
+
+      setState(() => loading = false);
+
+      if (user != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomePage()),
+        );
+      }
+    } catch (e) {
+      setState(() => loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
     }
   }
 

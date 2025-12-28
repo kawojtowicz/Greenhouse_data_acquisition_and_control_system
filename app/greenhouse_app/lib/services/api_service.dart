@@ -1,38 +1,33 @@
 import 'package:dio/dio.dart';
-import '../models/user.dart';
 import 'package:flutter/material.dart';
-import 'dio_client.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dio_client.dart';
+import '../providers/user_provider.dart';
 import '../models/greenhouse_controller.dart';
+import '../models/discovered_device.dart';
+import '../models/sensor_node.dart';
+import '../models/greenhouse.dart';
+import '../models/zone.dart';
+import '../models/end_device.dart';
 
 class ApiService {
-  final Dio dio;
-
-  ApiService() : dio = DioClient().dio;
+  final Dio dio = DioClient().dio;
+  final String baseUrl =
+      'https://greenhouse-data-acquisition-and-control.onrender.com';
 
   Future<bool> logoutUser(BuildContext context) async {
     try {
       final response = await dio.delete(
-        'http://192.168.0.101:3000/users',
+        '$baseUrl/users',
         options: Options(headers: {'Content-Type': 'application/json'}),
       );
 
       if (response.statusCode == 200 || response.statusCode == 401) {
         final prefs = await SharedPreferences.getInstance();
-
-        // await prefs.remove('accessToken');
-        // await prefs.remove('refreshToken');
-        await prefs.remove('id');
-        await prefs.remove('email');
-        await prefs.remove('name');
-        await prefs.remove('lastName');
-
+        await prefs.clear();
         await DioClient().getCookieJar().deleteAll();
-
         Provider.of<UserProvider>(context, listen: false).clearUser();
-
         print('Dane użytkownika wyczyszczone');
         return true;
       } else {
@@ -48,12 +43,10 @@ class ApiService {
   Future<Map<String, dynamic>?> fetchUserData() async {
     try {
       final response = await dio.get(
-        'http://192.168.0.101:3000/users',
+        '$baseUrl/users',
         options: Options(headers: {'Content-Type': 'application/json'}),
       );
-      if (response.statusCode == 200) {
-        return response.data;
-      }
+      if (response.statusCode == 200) return response.data;
     } catch (e) {
       print('fetchUserData error: $e');
     }
@@ -62,75 +55,360 @@ class ApiService {
 
   Future<List<GreenhouseController>> fetchUserSensorNodes() async {
     try {
-      final response = await dio.get('http://192.168.0.101:3000/users/sensors');
-      print('Status code: ${response.statusCode}');
-      print('Response data: ${response.data}');
-
+      final response = await dio.get('$baseUrl/users/sensors');
       if (response.statusCode == 200) {
         final List data = response.data['controllers'];
-        print('Controllers data: $data');
         return data.map((c) => GreenhouseController.fromJson(c)).toList();
-      } else {
-        print('Unexpected status code: ${response.statusCode}');
       }
-    } catch (e, stack) {
-      print('fetchUserSensors error: $e');
-      print(stack);
+    } catch (e) {
+      print('fetchUserSensorNodes error: $e');
     }
     return [];
   }
 
-  Future<bool> updateGreenhouseTemperature(
-    int greenhouseId,
-    double temperature,
-  ) async {
+  Future<void> saveSensorPosition(int sensorId, double x, double y) async {
+    try {
+      await dio.post(
+        '$baseUrl/users/sensors/position',
+        data: {'id_sensor_node': sensorId, 'x': x, 'y': y},
+      );
+    } catch (e) {
+      print('saveSensorPosition error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> addGreenhouse(
+    String name, [
+    String? description,
+  ]) async {
     try {
       final response = await dio.post(
-        'http://192.168.0.101:3000/users/$greenhouseId/temperature',
-        data: {'temperature_set': temperature},
+        '$baseUrl/users/greenhouses',
+        data: {
+          'greenhouse_name': name,
+          if (description != null) 'description': description,
+        },
         options: Options(headers: {'Content-Type': 'application/json'}),
       );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Temperatura zaktualizowana: ${response.data}');
-        return true;
-      } else {
-        print('Błąd aktualizacji temperatury: ${response.statusCode}');
-        return false;
-      }
+      if (response.statusCode == 201) return response.data['greenhouse'];
+      throw Exception(
+        'Nie udało się utworzyć szklarni. Status: ${response.statusCode}',
+      );
     } catch (e) {
-      print('updateGreenhouseTemperature error: $e');
-      return false;
+      print('addGreenhouse error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> changeSensorGreenhouse(int sensorId, int newGreenhouseId) async {
+    try {
+      await dio.post(
+        '$baseUrl/users/sensors/change-controller',
+        data: {
+          'id_sensor_node': sensorId,
+          'new_controller_id': newGreenhouseId,
+        },
+      );
+    } catch (e) {
+      print('changeSensorGreenhouse error: $e');
     }
   }
 
   Future<List<Map<String, dynamic>>> fetchLastHTLLogs(int greenhouseId) async {
     try {
       final response = await dio.get(
-        'http://192.168.0.101:3000/users/$greenhouseId/last-log',
+        '$baseUrl/users/$greenhouseId/last-log',
         options: Options(headers: {'Content-Type': 'application/json'}),
       );
-
-      print("DEBUG last-log response: ${response.data}"); // DODAJ TO
-
       if (response.statusCode == 200) {
         final data = response.data;
-
-        if (data is List) {
-          return List<Map<String, dynamic>>.from(data);
-        }
-
-        if (data is Map && data['logs'] is List) {
+        if (data is List) return List<Map<String, dynamic>>.from(data);
+        if (data is Map && data['logs'] is List)
           return List<Map<String, dynamic>>.from(data['logs']);
-        }
-
-        if (data is Map) {
-          return [Map<String, dynamic>.from(data)];
-        }
+        if (data is Map) return [Map<String, dynamic>.from(data)];
       }
     } catch (e) {
       print('fetchLastHTLLogs error: $e');
     }
     return [];
+  }
+
+  Future<List<DiscoveredDevice>> fetchDiscoveredDevices() async {
+    try {
+      final response = await dio.get('$baseUrl/users/unassigned');
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((d) => DiscoveredDevice.fromJson(d))
+            .toList();
+      }
+    } catch (e) {
+      print('fetchDiscoveredDevices error: $e');
+    }
+    return [];
+  }
+
+  Future<String?> assignDevice(String deviceId) async {
+    try {
+      final response = await dio.post(
+        '$baseUrl/users/assign',
+        data: {'device_id': deviceId},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+      if (response.statusCode == 200 && response.data['token'] != null) {
+        return response.data['token'];
+      }
+    } catch (e) {
+      print('assignDevice error: $e');
+    }
+    return null;
+  }
+
+  Future<List<SensorNode>> fetchUnassignedSensors() async {
+    try {
+      final response = await dio.get(
+        '$baseUrl/users/sensors/unassigned',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((e) => SensorNode.fromJson(e))
+            .toList();
+      }
+    } catch (e) {
+      print('fetchUnassignedSensors error: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllUserZones() async {
+    try {
+      final response = await dio.get(
+        '$baseUrl/users/zones/all',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['zones'];
+        return List<Map<String, dynamic>>.from(data);
+      }
+    } catch (e) {
+      print('fetchAllUserZones error: $e');
+    }
+    return [];
+  }
+
+  Future<void> assignSensorToZone(int sensorId, int zoneId) async {
+    try {
+      await dio.post(
+        '$baseUrl/users/sensors/assign-zone',
+        data: {'id_sensor_node': sensorId, 'id_zone': zoneId},
+      );
+    } catch (e) {
+      print('assignSensorToZone error: $e');
+      throw e;
+    }
+  }
+
+  Future<List<Greenhouse>> fetchUserGreenhouses() async {
+    try {
+      final response = await dio.get('$baseUrl/users/greenhouses');
+      if (response.statusCode == 200) {
+        final List data = response.data['greenhouses'];
+        return data.map((g) => Greenhouse.fromJson(g)).toList();
+      }
+    } catch (e) {
+      print('fetchUserGreenhouses error: $e');
+    }
+    return [];
+  }
+
+  Future<int?> createZone(
+    int greenhouseId,
+    String zoneName,
+    double x,
+    double y,
+    double width,
+    double height,
+  ) async {
+    try {
+      final response = await dio.post(
+        '$baseUrl/users/zones',
+        data: {
+          'greenhouse_id': greenhouseId,
+          'zone_name': zoneName,
+          'x': x.round(),
+          'y': y.round(),
+          'width': width.round(),
+          'height': height.round(),
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data['zone']['id_zone'];
+      }
+    } catch (e) {
+      print('createZone error: $e');
+    }
+
+    return null;
+  }
+
+  Future<List<Zone>> fetchZonesWithSensors(int greenhouseId) async {
+    try {
+      final response = await dio.get(
+        '$baseUrl/users/zones?greenhouse_id=$greenhouseId',
+      );
+
+      if (response.statusCode == 200) {
+        final List data = response.data['zones'];
+        return data.map((z) => Zone.fromJson(z)).toList();
+      }
+    } catch (e) {
+      print('fetchZonesWithSensors error: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAllSensorsForGreenhouse(
+    int greenhouseId,
+  ) async {
+    try {
+      final response = await dio.get(
+        '$baseUrl/users/$greenhouseId/sensors/all',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        return List<Map<String, dynamic>>.from(response.data);
+      }
+    } catch (e) {
+      print('fetchAllSensorsForGreenhouse error: $e');
+    }
+    return [];
+  }
+
+  Future<void> deleteZone(int zoneId) async {
+    try {
+      await dio.delete('$baseUrl/users/zones/$zoneId');
+    } catch (e) {
+      print('deleteZone error: $e');
+      throw e;
+    }
+  }
+
+  Future<List<EndDevice>> fetchEndDevices(int greenhouseId) async {
+    try {
+      final response = await dio.get(
+        '$baseUrl/users/$greenhouseId/end-devices',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200 && response.data is List) {
+        final List data = response.data;
+        return data.map((d) => EndDevice.fromJson(d)).toList();
+      }
+    } catch (e) {
+      print('fetchEndDevices error: $e');
+    }
+    return [];
+  }
+
+  Future<void> saveEndDevicePosition(int id, double x, double y) async {
+    try {
+      await dio.post(
+        '$baseUrl/users/end-devices/position',
+        data: {'id_end_device': id, 'x': x, 'y': y},
+      );
+      print('End device position saved: $id at ($x, $y)');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        print('Endpoint not found. Check server URL.');
+      } else if (e.response?.statusCode == 403) {
+        print('Access denied.');
+      } else {
+        print('Error saving end device position: $e');
+      }
+    }
+  }
+
+  Future<List<GreenhouseController>> fetchControllers(int greenhouseId) async {
+    try {
+      final response = await dio.get(
+        '$baseUrl/users/greenhouse/$greenhouseId/controllers',
+      );
+      print('fetchControllers response: ${response.data}');
+      if (response.statusCode == 200) {
+        return (response.data as List)
+            .map((c) => GreenhouseController.fromJson(c))
+            .toList();
+      }
+    } catch (e) {
+      print('fetchControllers error: $e');
+    }
+    return [];
+  }
+
+  Future<void> assignZoneToController({
+    required int zoneId,
+    required int controllerId,
+  }) async {
+    try {
+      await dio.post(
+        '$baseUrl/users/zones/$zoneId/assign-controller',
+        data: {'controller_id': controllerId},
+      );
+    } catch (e) {
+      print('assignZoneToController error: $e');
+    }
+  }
+
+  Future<List<EndDevice>> fetchUnassignedEndDevices() async {
+    try {
+      final response = await dio.get('$baseUrl/users/end-devices/unassigned');
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((e) => EndDevice.fromJson(e))
+            .toList();
+      }
+    } catch (e) {
+      print('fetchUnassignedEndDevices error: $e');
+    }
+    return [];
+  }
+
+  Future<void> assignEndDeviceToZone(int endDeviceId, int zoneId) async {
+    try {
+      await dio.post(
+        '$baseUrl/users/end-devices/assign-zone',
+        data: {'id_end_device': endDeviceId, 'id_zone': zoneId},
+      );
+    } catch (e) {
+      print('assignEndDeviceToZone error: $e');
+      throw e;
+    }
+  }
+
+  Future<void> updateEndDeviceParams({
+    required int id,
+    double? upTemp,
+    double? downTemp,
+    double? upHum,
+    double? downHum,
+    double? upLight,
+    double? downLight,
+  }) async {
+    await dio.post(
+      '$baseUrl/users/end-devices/update-params',
+      data: {
+        'id_end_device': id,
+        'up_temp': upTemp,
+        'down_temp': downTemp,
+        'up_hum': upHum,
+        'down_hum': downHum,
+        'up_light': upLight,
+        'down_light': downLight,
+      },
+    );
   }
 }

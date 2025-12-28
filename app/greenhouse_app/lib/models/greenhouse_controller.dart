@@ -1,28 +1,29 @@
-import 'sensor_node.dart';
+import 'zone.dart';
 
 class GreenhouseController {
   final int id;
-  final String greenhouseName;
-  final double temperatureSet;
-  final List<SensorNode> sensorNodes;
+  final String? deviceId;
+  final String? deviceToken;
+  final String? greenhouseName;
+  final List<Zone> zones;
 
   GreenhouseController({
     required this.id,
-    required this.greenhouseName,
-    required this.temperatureSet,
-    required this.sensorNodes,
+    this.deviceId,
+    this.deviceToken,
+    this.greenhouseName,
+    required this.zones,
   });
 
   factory GreenhouseController.fromJson(Map<String, dynamic> json) {
     return GreenhouseController(
       id: json['id_greenhouse_controller'],
+      deviceId: json['device_id'],
+      deviceToken: json['device_token'],
       greenhouseName: json['greenhouse_name'],
-      temperatureSet: (json['temperature_set'] ?? 0).toDouble(),
-      sensorNodes:
-          (json['sensor_nodes'] as List<dynamic>?)
-              ?.map((e) => SensorNode.fromJson(e))
-              .toList() ??
-          [],
+      zones: (json['zones'] as List? ?? [])
+          .map((z) => Zone.fromJson(z))
+          .toList(),
     );
   }
 }
