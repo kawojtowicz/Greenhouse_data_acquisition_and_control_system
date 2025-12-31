@@ -14,7 +14,8 @@ import '../models/end_device.dart';
 class ApiService {
   final Dio dio = DioClient().dio;
   final String baseUrl =
-      'https://greenhouse-data-acquisition-and-control.onrender.com';
+      // 'https://greenhouse-data-acquisition-and-control.onrender.com';
+      'http://192.168.0.101:3000';
 
   Future<bool> logoutUser(BuildContext context) async {
     try {
@@ -410,5 +411,70 @@ class ApiService {
         'down_light': downLight,
       },
     );
+  }
+
+  Future<void> deleteGreenhouse(int greenhouseId) async {
+    try {
+      await dio.delete(
+        '$baseUrl/users/greenhouses/$greenhouseId',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+    } catch (e) {
+      print('deleteGreenhouse error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateGreenhouseName(
+    int greenhouseId,
+    String newName, [
+    String? description,
+  ]) async {
+    try {
+      final response = await dio.post(
+        '$baseUrl/users/greenhouses/update',
+        data: {
+          'id_greenhouse': greenhouseId,
+          'new_name': newName,
+          if (description != null) 'description': description,
+        },
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        print('Nazwa szklarni zaktualizowana na: $newName');
+      } else {
+        print(
+          'Nie udało się zaktualizować nazwy szklarni. Status: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('updateGreenhouseName error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> unassignSensorFromZone(int sensorId) async {
+    try {
+      await dio.post(
+        '$baseUrl/users/sensors/unassign-zone',
+        data: {'id_sensor_node': sensorId},
+      );
+    } catch (e) {
+      print('Error unassigning sensor: $e');
+      throw e;
+    }
+  }
+
+  Future<void> unassignEndDeviceFromZone(int endDeviceId) async {
+    try {
+      await dio.post(
+        '$baseUrl/users/end-devices/unassign-zone',
+        data: {'id_end_device': endDeviceId},
+      );
+    } catch (e) {
+      print('Error unassigning end device: $e');
+      throw e;
+    }
   }
 }

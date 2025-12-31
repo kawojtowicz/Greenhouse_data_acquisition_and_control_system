@@ -180,7 +180,6 @@ router.post('/sensors/position', isUserAuthenticated, async (req, res) => {
     }
 });
 
-// Get last logs for a controller
 router.get('/:id/last-log', isUserAuthenticated, async (req, res) => {
   const controllerId = req.params.id;
   try {
@@ -213,7 +212,6 @@ router.get('/:id/last-log', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Get end devices in a zone
 router.get('/zones/:zoneId/devices', isUserAuthenticated, async (req, res) => {
   const { zoneId } = req.params;
   try {
@@ -228,7 +226,6 @@ router.get('/zones/:zoneId/devices', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Change sensor controller
 router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) => {
   const { id_sensor_node, new_controller_id } = req.body;
   if (!id_sensor_node || !new_controller_id) {
@@ -236,7 +233,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
   }
 
   try {
-    // Check sensor ownership
     const sensorRes = await db.query(`
       SELECT sn.id_sensor_node
       FROM Sensor_nodes sn
@@ -249,7 +245,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
     if (sensorRes.rows.length === 0)
       return res.status(403).json({ message: 'Access denied: sensor not found or not owned by user' });
 
-    // Check new controller ownership
     const controllerRes = await db.query(
       'SELECT id_greenhouse_controller FROM Greenhouse_controllers WHERE id_greenhouse_controller = $1 AND id_user = $2',
       [new_controller_id, req.session.user.id]
@@ -257,7 +252,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
     if (controllerRes.rows.length === 0)
       return res.status(403).json({ message: 'Access denied: controller not found or not owned by user' });
 
-    // Get first zone in new controller
     const zoneRes = await db.query(
       'SELECT id_zone FROM Zones WHERE id_greenhouse_controller = $1 ORDER BY id_zone LIMIT 1',
       [new_controller_id]
@@ -267,7 +261,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
 
     const newZoneId = zoneRes.rows[0].id_zone;
 
-    // Update sensor zone
     await db.query('UPDATE Sensor_nodes SET id_zone = $1 WHERE id_sensor_node = $2', [newZoneId, id_sensor_node]);
 
     res.json({
@@ -282,7 +275,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
   }
 });
 
-// Get zones for a greenhouse
 router.get('/zones', isUserAuthenticated, async (req, res) => {
   const greenhouseId = req.query.greenhouse_id;
   if (!greenhouseId) return res.status(400).json({ message: 'greenhouse_id required' });
@@ -312,7 +304,7 @@ router.get('/zones', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Get zones for a controller
+
 router.get('/greenhouses/:controllerId/zones', isUserAuthenticated, async (req, res) => {
   const { controllerId } = req.params;
   try {
@@ -341,7 +333,6 @@ router.get('/greenhouses/:controllerId/zones', isUserAuthenticated, async (req, 
   }
 });
 
-// Get unassigned controllers
 router.get('/unassigned', isUserAuthenticated, async (req, res) => {
   try {
     const result = await db.query('SELECT device_id FROM Greenhouse_controllers WHERE id_user IS NULL');
@@ -352,7 +343,7 @@ router.get('/unassigned', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Assign device
+
 router.post('/assign', isUserAuthenticated, async (req, res) => {
   const { device_id } = req.body;
   if (!device_id) return res.status(400).json({ message: 'device_id required' });
@@ -371,7 +362,7 @@ router.post('/assign', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Get unassigned sensors
+
 router.get('/sensors/unassigned', isUserAuthenticated, async (req, res) => {
   try {
     const result = await db.query(`
@@ -389,7 +380,7 @@ router.get('/sensors/unassigned', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Create greenhouse
+
 router.post('/greenhouses', isUserAuthenticated, async (req, res) => {
   const { greenhouse_name, description } = req.body;
   if (!greenhouse_name || greenhouse_name.trim() === '') return res.status(400).json({ message: 'Nazwa szklarni jest wymagana' });
@@ -423,7 +414,7 @@ router.post('/greenhouses', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Get user greenhouses
+
 router.get('/greenhouses', isUserAuthenticated, async (req, res) => {
   try {
     const result = await db.query('SELECT * FROM Greenhouses WHERE id_user = $1', [req.session.user.id]);
@@ -434,7 +425,7 @@ router.get('/greenhouses', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Assign sensor to zone
+
 router.post('/sensors/assign-zone', isUserAuthenticated, async (req, res) => {
   const { id_sensor_node, id_zone } = req.body;
 
@@ -477,7 +468,7 @@ router.post('/sensors/assign-zone', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Create zone
+
 router.post('/zones', isUserAuthenticated, async (req, res) => {
   const { zone_name, greenhouse_id, x, y, width, height } = req.body;
 
@@ -517,7 +508,7 @@ router.post('/zones', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Get all user zones
+
 router.get('/zones/all', isUserAuthenticated, async (req, res) => {
   try {
     const zonesRes = await db.query(`
@@ -535,7 +526,7 @@ router.get('/zones/all', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Get all sensors for a greenhouse
+
 router.get('/:id/sensors/all', isUserAuthenticated, async (req, res) => {
   const greenhouseId = req.params.id;
 
@@ -565,7 +556,7 @@ router.get('/:id/sensors/all', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Delete zone
+
 router.delete('/zones/:zoneId', isUserAuthenticated, async (req, res) => {
   const { zoneId } = req.params;
 
@@ -590,7 +581,7 @@ router.delete('/zones/:zoneId', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Get end devices for a greenhouse
+
 router.get('/:greenhouseId/end-devices', isUserAuthenticated, async (req, res) => {
   const { greenhouseId } = req.params;
 
@@ -608,7 +599,7 @@ router.get('/:greenhouseId/end-devices', isUserAuthenticated, async (req, res) =
   }
 });
 
-// Update end device position
+
 router.post('/end-devices/position', isUserAuthenticated, async (req, res) => {
   const { id_end_device, x, y } = req.body;
 
@@ -636,7 +627,7 @@ router.post('/end-devices/position', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Assign controller to zone
+
 router.post('/zones/:id/assign-controller', isUserAuthenticated, async (req, res) => {
   const zoneId = req.params.id;
   const { controller_id } = req.body;
@@ -650,7 +641,7 @@ router.post('/zones/:id/assign-controller', isUserAuthenticated, async (req, res
   }
 });
 
-// Get unassigned end devices
+
 router.get('/end-devices/unassigned', isUserAuthenticated, async (req, res) => {
   try {
     const devices = await db.query(`
@@ -668,7 +659,6 @@ router.get('/end-devices/unassigned', isUserAuthenticated, async (req, res) => {
   }
 });
 
-// Assign end device to zone
 router.post('/end-devices/assign-zone', isUserAuthenticated, async (req, res) => {
   const { id_end_device, id_zone } = req.body;
 
@@ -697,7 +687,7 @@ router.post('/end-devices/assign-zone', isUserAuthenticated, async (req, res) =>
   }
 });
 
-// Update end device parameters
+
 router.post('/end-devices/update-params', isUserAuthenticated, async (req, res) => {
   const { id_end_device, up_temp, down_temp, up_hum, down_hum, up_light, down_light } = req.body;
 
@@ -743,6 +733,156 @@ router.get('/greenhouse/:id/controllers', isUserAuthenticated, async (req, res) 
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+
+router.delete('/greenhouses/:id', isUserAuthenticated, async (req, res) => {
+  const greenhouseId = req.params.id;
+  const userId = req.session.user.id;
+
+  try {
+    const ghCheck = await db.query(
+      'SELECT id_greenhouse FROM Greenhouses WHERE id_greenhouse = $1 AND id_user = $2',
+      [greenhouseId, userId]
+    );
+
+    if (ghCheck.rows.length === 0) {
+      return res.status(403).json({ message: 'Access denied or greenhouse not found' });
+    }
+
+    const zonesRes = await db.query(
+      'SELECT id_zone FROM Zones WHERE id_greenhouse = $1',
+      [greenhouseId]
+    );
+
+    const zoneIds = zonesRes.rows.map(z => z.id_zone);
+
+    if (zoneIds.length > 0) {
+      await db.query(
+        'UPDATE Sensor_nodes SET id_zone = NULL WHERE id_zone = ANY($1)',
+        [zoneIds]
+      );
+
+      await db.query(
+        'UPDATE End_devices SET id_zone = NULL WHERE id_zone = ANY($1)',
+        [zoneIds]
+      );
+
+      await db.query(
+        'DELETE FROM Zones WHERE id_zone = ANY($1)',
+        [zoneIds]
+      );
+    }
+
+    await db.query(
+      'DELETE FROM Greenhouses WHERE id_greenhouse = $1',
+      [greenhouseId]
+    );
+
+    res.json({
+      message: 'Greenhouse deleted successfully',
+      id_greenhouse: greenhouseId
+    });
+  } catch (err) {
+    console.error('Error deleting greenhouse:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/greenhouses/update', isUserAuthenticated, async (req, res) => {
+  const { id_greenhouse, new_name, description } = req.body;
+
+  if (!id_greenhouse || !new_name || new_name.trim() === '') {
+    return res.status(400).json({ message: 'id_greenhouse i nowa nazwa szklarni są wymagane' });
+  }
+
+  try {
+    const ghRes = await db.query(
+      'SELECT id_greenhouse FROM Greenhouses WHERE id_greenhouse = $1 AND id_user = $2',
+      [id_greenhouse, req.session.user.id]
+    );
+
+    if (ghRes.rows.length === 0) {
+      return res.status(403).json({ message: 'Dostęp zabroniony lub szklarnia nie istnieje' });
+    }
+
+    const updateRes = await db.query(
+      'UPDATE Greenhouses SET greenhouse_name = $1, description = $2 WHERE id_greenhouse = $3 RETURNING *',
+      [new_name, description || null, id_greenhouse]
+    );
+
+    res.json({
+      message: 'Szklarnia zaktualizowana',
+      greenhouse: updateRes.rows[0]
+    });
+  } catch (err) {
+    console.error('Błąd aktualizacji szklarni:', err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+
+router.post('/sensors/unassign-zone', isUserAuthenticated, async (req, res) => {
+  const { id_sensor_node } = req.body;
+
+  if (!id_sensor_node) {
+    return res.status(400).json({ message: 'id_sensor_node wymagane' });
+  }
+
+  try {
+
+    const check = await db.query(`
+      SELECT s.id_sensor_node
+      FROM Sensor_nodes s
+      LEFT JOIN Zones z ON s.id_zone = z.id_zone
+      LEFT JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE s.id_sensor_node = $1 AND g.id_user = $2
+    `, [id_sensor_node, req.session.user.id]);
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Dostęp zabroniony' });
+    }
+
+
+    await db.query('UPDATE Sensor_nodes SET id_zone = NULL WHERE id_sensor_node = $1', [id_sensor_node]);
+
+    res.json({ message: 'Sensor odpięty od strefy', id_sensor_node });
+  } catch (err) {
+    console.error('Error unassigning sensor:', err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+
+router.post('/end-devices/unassign-zone', isUserAuthenticated, async (req, res) => {
+  const { id_end_device } = req.body;
+
+  if (!id_end_device) {
+    return res.status(400).json({ message: 'id_end_device wymagane' });
+  }
+
+  try {
+   
+    const check = await db.query(`
+      SELECT ed.id_end_device
+      FROM End_devices ed
+      LEFT JOIN Zones z ON ed.id_zone = z.id_zone
+      LEFT JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE ed.id_end_device = $1 AND g.id_user = $2
+    `, [id_end_device, req.session.user.id]);
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Dostęp zabroniony' });
+    }
+
+    await db.query('UPDATE End_devices SET id_zone = NULL WHERE id_end_device = $1', [id_end_device]);
+
+    res.json({ message: 'End device odpięty od strefy', id_end_device });
+  } catch (err) {
+    console.error('Error unassigning end device:', err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
 
 
 module.exports = router;

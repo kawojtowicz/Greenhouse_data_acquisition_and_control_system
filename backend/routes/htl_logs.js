@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // pg Pool
+const db = require('../db'); 
 
 router.get('/', async (req, res) => {
   try {
@@ -19,12 +19,12 @@ router.post('/', async (req, res) => {
 
   node_type = Number(node_type);
   if (![0,1].includes(node_type)) {
-    return res.status(400).json({ error: 'Invalid or missing node_type' });
+    return res.status(401).json({ error: 'Invalid or missing node_type' });
   }
 
 
   if (id_sensor_node === undefined || id_sensor_node === null) {
-    return res.status(400).json({ error: 'Missing id_sensor_node' });
+    return res.status(401).json({ error: 'Missing id_sensor_node' });
   }
 
   const id_sensor_node_num = BigInt(id_sensor_node.toString());
@@ -53,7 +53,7 @@ router.post('/', async (req, res) => {
     if (node_type === 1) { 
       if (temperature === undefined || humidity === undefined || light === undefined) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Missing sensor data' });
+        return res.status(401).json({ error: 'Missing sensor data' });
       }
 
       const { rows: sensorRows } = await client.query(
@@ -111,7 +111,7 @@ router.post('/', async (req, res) => {
     }
 
     await client.query('ROLLBACK');
-    res.status(400).json({ error: 'Invalid node_type' });
+    res.status(402).json({ error: 'Invalid node_type' });
 
   } catch (err) {
     await client.query('ROLLBACK');

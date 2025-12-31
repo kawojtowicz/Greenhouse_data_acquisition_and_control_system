@@ -30,7 +30,6 @@ class _WifiProvisioningPageState extends State<WifiProvisioningPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Domyślny IP CC3235SF w trybie AP
       const deviceIp = '10.123.45.1';
       final dio = Dio();
 

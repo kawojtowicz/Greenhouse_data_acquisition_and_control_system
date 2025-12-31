@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // pg Pool
+const db = require('../db');
 
 router.get('/', async (req, res) => {
   try {

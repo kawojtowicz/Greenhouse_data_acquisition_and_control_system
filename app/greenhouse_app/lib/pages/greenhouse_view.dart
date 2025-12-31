@@ -279,10 +279,8 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
       final rawDevices = await ApiService().fetchEndDevices(
         widget.greenhouse.id,
       );
-      print('Raw end devices: $rawDevices');
 
       endDevices = rawDevices.map((d) {
-        print('Mapping end device: $d');
         return EndDeviceTile(
           id: d.id,
           name: d.name,
@@ -296,8 +294,6 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
           downLight: d.downLight,
         );
       }).toList();
-
-      print('Mapped end devices: $endDevices');
     } catch (e) {
       print('Error fetching end devices: $e');
       endDevices = [];
@@ -382,8 +378,6 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
           isDragging: existing.isDragging,
         );
       }).toList();
-
-      print('Fetched sensors: $sensors');
     } catch (e) {
       print('Error fetching sensors: $e');
       sensors = [];
@@ -394,12 +388,6 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
     final fetched = await ApiService().fetchZonesWithSensors(
       widget.greenhouse.id,
     );
-
-    for (final z in fetched) {
-      print(
-        'Zone: ${z.name}, x: ${z.x}, y: ${z.y}, width: ${z.width}, height: ${z.height}',
-      );
-    }
 
     setState(() {
       zones = fetched
@@ -449,7 +437,12 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   }
 
   Future<void> _onSensorClicked(SensorTile sensor) async {
-    if (!changeLocationMode) return;
+    if (!changeLocationMode) {
+      setState(() {
+        sensor.isExpanded = !sensor.isExpanded;
+      });
+      return;
+    }
 
     final greenhouses = await ApiService().fetchUserGreenhouses();
 
@@ -535,12 +528,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
       );
 
       if (newZoneId != null) {
-        final int zoneId = newZoneId;
-        currentDrawing!.id = zoneId;
-        print(
-          'Zone saved to DB: $name at (${currentDrawing!.x}, ${currentDrawing!.y}) '
-          'size ${currentDrawing!.width}x${currentDrawing!.height}, id: $zoneId',
-        );
+        currentDrawing!.id = newZoneId;
       }
     } catch (e) {
       print('Error saving zone: $e');
@@ -556,7 +544,49 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.greenhouse.name)),
-      body: RefreshIndicator(onRefresh: _fetchAll, child: _buildMainView()),
+      body: RefreshIndicator(
+        onRefresh: _fetchAll,
+        child: Column(
+          children: [
+            if (editMode && !drawZoneMode)
+              Container(
+                width: double.infinity,
+                color: Colors.orangeAccent,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 6,
+                  horizontal: 12,
+                ),
+                child: const Text(
+                  'Tryb edycji: \n- Dotknij obiektu, aby edytować parametry.\n- Przeciągnij, aby zmienić lokalizację.\n- Wciśnij kosz, aby usunąć obiekt.\n- Wciśnij ikonę ołówka, aby rysować nowe strefy.',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            if (drawZoneMode)
+              Container(
+                width: double.infinity,
+                color: Colors.redAccent,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 6,
+                  horizontal: 12,
+                ),
+                child: const Text(
+                  'Tryb rysowania nowej strefy: \n - Przeciągnij po mapie, aby zaznaczyć obszar.\n - Naciśnij ikonę ołówna ponownie, aby wyjść.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+            Expanded(child: _buildMainView()),
+          ],
+        ),
+      ),
 
       floatingActionButton: editMode
           ? Column(
@@ -568,16 +598,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                       ? Colors.orange
                       : Colors.blueGrey,
                   onPressed: toggleDrawZoneMode,
-                  child: const Icon(Icons.crop_square),
-                ),
-                const SizedBox(height: 12),
-                FloatingActionButton(
-                  heroTag: 'move',
-                  backgroundColor: changeLocationMode
-                      ? Colors.orange
-                      : Colors.blue,
-                  onPressed: toggleChangeLocationMode,
-                  child: const Icon(Icons.swap_horiz),
+                  child: const Icon(Icons.edit),
                 ),
                 const SizedBox(height: 12),
                 FloatingActionButton(
@@ -612,7 +633,6 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
           child: Stack(
             children: [
               Positioned.fill(child: Container(color: Colors.green[50])),
-
               CustomPaint(
                 size: Size(mapSize, mapSize),
                 painter: ZonesPainter(zones: zones, current: currentDrawing),
@@ -626,42 +646,38 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                 final width = z.width.abs();
                 final height = z.height.abs();
 
-                return Stack(
-                  children: [
-                    Positioned(
-                      left: x,
-                      top: y,
-                      width: width,
-                      height: height,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (editMode)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  onPressed: () => _deleteZone(z),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.device_hub,
-                                    color: Colors.blue,
-                                    size: 20,
-                                  ),
-                                  onPressed: () => _assignZoneToController(z),
-                                ),
-                              ],
+                return Positioned(
+                  left: x,
+                  top: y,
+                  width: width,
+                  height: height,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (editMode)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                              onPressed: () => _deleteZone(z),
                             ),
-                        ],
-                      ),
-                    ),
-                  ],
+                            IconButton(
+                              icon: const Icon(
+                                Icons.device_hub,
+                                color: Colors.blue,
+                                size: 20,
+                              ),
+                              onPressed: () => _assignZoneToController(z),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
                 );
               }).toList(),
 
@@ -672,13 +688,12 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                       top: d.y,
                       child: GestureDetector(
                         onTap: () {
-                          if (editMode) {
-                            _editEndDevice(d);
-                          } else {
+                          if (!editMode) {
                             setState(() => d.isExpanded = !d.isExpanded);
+                          } else {
+                            _editEndDevice(d);
                           }
                         },
-
                         onPanStart: editMode
                             ? (_) => setState(() => d.isDragging = true)
                             : null,
@@ -700,42 +715,43 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                                     );
                               }
                             : null,
-
                         child: _buildEndDeviceTile(d),
                       ),
                     ),
                   )
                   .toList(),
 
-              ...sensors.map(
-                (s) => Positioned(
-                  left: s.x,
-                  top: s.y,
-                  child: GestureDetector(
-                    onTap: () => _onSensorClicked(s),
-                    onPanStart: editMode && !changeLocationMode
-                        ? (_) => setState(() => s.isDragging = true)
-                        : null,
-                    onPanUpdate: editMode && !changeLocationMode
-                        ? (d) => setState(() {
-                            s.x += d.delta.dx;
-                            s.y += d.delta.dy;
-                          })
-                        : null,
-                    onPanEnd: editMode && !changeLocationMode
-                        ? (_) async {
-                            s.isDragging = false;
-                            await ApiService().saveSensorPosition(
-                              s.id,
-                              s.x,
-                              s.y,
-                            );
-                          }
-                        : null,
-                    child: _buildSensorTile(s),
-                  ),
-                ),
-              ),
+              ...sensors
+                  .map(
+                    (s) => Positioned(
+                      left: s.x,
+                      top: s.y,
+                      child: GestureDetector(
+                        onTap: () => _onSensorClicked(s),
+                        onPanStart: editMode && !changeLocationMode
+                            ? (_) => setState(() => s.isDragging = true)
+                            : null,
+                        onPanUpdate: editMode && !changeLocationMode
+                            ? (d) => setState(() {
+                                s.x += d.delta.dx;
+                                s.y += d.delta.dy;
+                              })
+                            : null,
+                        onPanEnd: editMode && !changeLocationMode
+                            ? (_) async {
+                                s.isDragging = false;
+                                await ApiService().saveSensorPosition(
+                                  s.id,
+                                  s.x,
+                                  s.y,
+                                );
+                              }
+                            : null,
+                        child: _buildSensorTile(s),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ],
           ),
         ),
@@ -744,143 +760,244 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   }
 
   Widget _buildSensorTile(SensorTile sensor) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          sensor.isExpanded = !sensor.isExpanded;
-        });
-      },
-      child: Container(
-        width: 100,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.blueAccent.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.sensors, color: Colors.white, size: 25),
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: () {
+            if (!editMode) {
+              setState(() {
+                sensor.isExpanded = !sensor.isExpanded;
+              });
+            }
+          },
+          child: Container(
+            width: 100,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blueAccent.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(Icons.sensors, color: Colors.white, size: 25),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (sensor.isExpanded || editMode)
+                        Text(
+                          sensor.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      if (sensor.temperature != null)
+                        Text(
+                          sensor.isExpanded
+                              ? 'Temperature: ${sensor.temperature}°C'
+                              : 'T: ${sensor.temperature}°C',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (sensor.humidity != null)
+                        Text(
+                          sensor.isExpanded
+                              ? 'Humidity: ${sensor.humidity}%'
+                              : 'H: ${sensor.humidity}%',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (sensor.light != null)
+                        Text(
+                          sensor.isExpanded
+                              ? 'Light: ${sensor.light}lx'
+                              : 'L: ${sensor.light}lx',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (sensor.isExpanded)
-                    Text(
-                      sensor.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+          ),
+        ),
+        if (editMode)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+              tooltip: 'Odłącz od strefy',
+              onPressed: () async {
+                try {
+                  await ApiService().unassignSensorFromZone(sensor.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sensor odłączony od strefy')),
+                  );
+                  _fetchAll();
+                } catch (e) {
+                  print('Error unassigning sensor: $e');
+                }
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildEndDeviceTile(EndDeviceTile device) {
+    String lightDisplay(double? light, double? upTemp, double? downTemp) {
+      if (light == null) return '-';
+      if (upTemp != null && light > upTemp) return 'Wyłącz';
+      if (downTemp != null && light < downTemp) return 'Wyłącz';
+      return light.toString();
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (!editMode) {
+          setState(() {
+            device.isExpanded = !device.isExpanded;
+          });
+        } else {
+          _editEndDevice(device);
+        }
+      },
+      child: Stack(
+        children: [
+          Container(
+            width: 100,
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.purple.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.router, color: Colors.white, size: 25),
+                const SizedBox(width: 6),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (device.isExpanded || editMode)
+                        Text(
+                          device.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                      if (device.upTemp != null)
+                        Text(
+                          device.isExpanded || editMode
+                              ? 'T↑: ${device.upTemp}'
+                              : 'T↑: ${device.upTemp}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (device.downTemp != null)
+                        Text(
+                          device.isExpanded || editMode
+                              ? 'T↓: ${device.downTemp}'
+                              : 'T↓: ${device.downTemp}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (device.upHum != null)
+                        Text(
+                          device.isExpanded || editMode
+                              ? 'H↑: ${device.upHum}'
+                              : 'H↑: ${device.upHum}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (device.downHum != null)
+                        Text(
+                          device.isExpanded || editMode
+                              ? 'H↓: ${device.downHum}'
+                              : 'H↓: ${device.downHum}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (device.upLight != null)
+                        Text(
+                          device.isExpanded || editMode
+                              ? 'L↑: ${lightDisplay(device.upLight, device.upTemp, device.downTemp)}'
+                              : 'L↑: ${device.upLight}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (device.downLight != null)
+                        Text(
+                          device.isExpanded || editMode
+                              ? 'L↓: ${lightDisplay(device.downLight, device.upTemp, device.downTemp)}'
+                              : 'L↓: ${device.downLight}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (editMode)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                tooltip: 'Odłącz od strefy',
+                onPressed: () async {
+                  try {
+                    await ApiService().unassignEndDeviceFromZone(device.id);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Urządzenie odłączone od strefy'),
                       ),
-                    ),
-                  if (sensor.temperature != null)
-                    Text(
-                      sensor.isExpanded
-                          ? 'Temperature: ${sensor.temperature}°C'
-                          : 'T: ${sensor.temperature}°C',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  if (sensor.humidity != null)
-                    Text(
-                      sensor.isExpanded
-                          ? 'Humidity: ${sensor.humidity}%'
-                          : 'H: ${sensor.humidity}%',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  if (sensor.light != null)
-                    Text(
-                      sensor.isExpanded
-                          ? 'Light: ${sensor.light}lx'
-                          : 'L: ${sensor.light}lx',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                ],
+                    );
+                    _fetchEndDevices();
+                  } catch (e) {
+                    print('Error unassigning end device: $e');
+                  }
+                },
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
-}
-
-Widget _buildEndDeviceTile(EndDeviceTile device) {
-  String lightDisplay(double? light, double? upTemp, double? downTemp) {
-    if (light == null) return '-';
-    if (upTemp != null && light > upTemp) return 'Wyłącz';
-    if (downTemp != null && light < downTemp) return 'Wyłącz';
-    return light.toString();
-  }
-
-  return Container(
-    width: 100,
-    padding: const EdgeInsets.all(6),
-    decoration: BoxDecoration(
-      color: Colors.purple.withOpacity(0.7),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.device_hub, color: Colors.white, size: 20),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                device.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        if (device.upTemp != null)
-          Text(
-            'T↑: ${device.upTemp}',
-            style: const TextStyle(color: Colors.white, fontSize: 10),
-          ),
-        if (device.downTemp != null)
-          Text(
-            'T↓: ${device.downTemp}',
-            style: const TextStyle(color: Colors.white, fontSize: 10),
-          ),
-        if (device.upHum != null)
-          Text(
-            'H↑: ${device.upHum}',
-            style: const TextStyle(color: Colors.white, fontSize: 10),
-          ),
-        if (device.downHum != null)
-          Text(
-            'H↓: ${device.downHum}',
-            style: const TextStyle(color: Colors.white, fontSize: 10),
-          ),
-        if (device.upLight != null)
-          Text(
-            'L↑: ${device.isExpanded ? lightDisplay(device.upLight, device.upTemp, device.downTemp) : device.upLight}',
-            style: const TextStyle(color: Colors.white, fontSize: 10),
-          ),
-        if (device.downLight != null)
-          Text(
-            'L↓: ${device.isExpanded ? lightDisplay(device.downLight, device.upTemp, device.downTemp) : device.downLight}',
-            style: const TextStyle(color: Colors.white, fontSize: 10),
-          ),
-      ],
-    ),
-  );
 }
 
 class ZonesPainter extends CustomPainter {

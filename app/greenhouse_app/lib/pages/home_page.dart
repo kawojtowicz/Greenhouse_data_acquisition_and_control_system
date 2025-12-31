@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:greenhouse_app/pages/discover_devices_page.dart';
 import 'package:greenhouse_app/pages/greenhouse_view.dart';
 import 'package:greenhouse_app/pages/wifi_provisioning_page.dart';
+import 'package:greenhouse_app/pages/discover_nodes_page.dart';
 import '../services/api_service.dart';
 import '../models/greenhouse.dart';
-import 'package:greenhouse_app/pages/discover_nodes_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,6 +16,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final api = ApiService();
   late Future<List<Greenhouse>> greenhousesFuture;
+
+  bool editMode = false;
+  bool showAddFAB = false;
 
   @override
   void initState() {
@@ -39,6 +42,13 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void navigateToUnassignedDevices() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const UnassignedDevicesPage()),
+    );
+  }
+
   void navigateToWifiProvisioning() {
     Navigator.push(
       context,
@@ -46,13 +56,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _addNewGreenhouseDialog() {
+  Future<void> _addNewGreenhouseDialog() async {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
         title: const Text('Dodaj nową szklarnię'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -84,23 +94,15 @@ class _HomePageState extends State<HomePage> {
                 return;
               }
 
-              try {
-                await api.addGreenhouse(
-                  name,
-                  description.isNotEmpty ? description : null,
-                );
-                Navigator.pop(context);
-                setState(() {
-                  greenhousesFuture = api.fetchUserGreenhouses();
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Szklarnia utworzona')),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Błąd tworzenia szklarni: $e')),
-                );
-              }
+              await api.addGreenhouse(
+                name,
+                description.isNotEmpty ? description : null,
+              );
+
+              Navigator.pop(context);
+              setState(() {
+                greenhousesFuture = api.fetchUserGreenhouses();
+              });
             },
             child: const Text('Dodaj'),
           ),
@@ -109,134 +111,301 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<void> _deleteGreenhouse(Greenhouse greenhouse) async {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Usuń szklarnię'),
+        content: Text(
+          'Czy na pewno chcesz usunąć szklarnię "${greenhouse.name}"?\nWszystkie dane zostaną utracone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Anuluj'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context);
+              await api.deleteGreenhouse(greenhouse.id);
+              setState(() {
+                greenhousesFuture = api.fetchUserGreenhouses();
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Szklarnia usunięta')),
+              );
+            },
+            child: const Text('Usuń'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editGreenhouseNameDialog(Greenhouse greenhouse) async {
+    final nameController = TextEditingController(text: greenhouse.name);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Edytuj nazwę szklarni'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(labelText: 'Nowa nazwa'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Anuluj'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isEmpty) return;
+
+              Navigator.pop(context);
+              await api.updateGreenhouseName(greenhouse.id, newName);
+              setState(() {
+                greenhousesFuture = api.fetchUserGreenhouses();
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Nazwa szklarni zaktualizowana')),
+              );
+            },
+            child: const Text('Zapisz'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onMenuSelected(String value) {
+    switch (value) {
+      case 'add_device':
+        navigateToDiscoverDevices();
+        break;
+      case 'unassigned_devices':
+        navigateToUnassignedDevices();
+        break;
+      case 'wifi':
+        navigateToWifiProvisioning();
+        break;
+      case 'logout':
+        logout();
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Twoje obiekty'),
+        title: const Text('Twoje szklarnie'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.wifi),
-            tooltip: 'Wi-Fi Provisioning',
-            onPressed: navigateToWifiProvisioning,
-          ),
-          IconButton(
-            icon: const Icon(Icons.sensors_off),
-            tooltip: 'Nieprzypisane czujniki',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const UnassignedDevicesPage(),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.menu),
+            onSelected: _onMenuSelected,
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'add_device',
+                child: ListTile(
+                  leading: Icon(Icons.add_box),
+                  title: Text('Dodaj nowy kontroler'),
                 ),
-              );
-            },
+              ),
+              const PopupMenuItem(
+                value: 'unassigned_devices',
+                child: ListTile(
+                  leading: Icon(Icons.sensors_off),
+                  title: Text('Nieprzypisane czujniki'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'wifi',
+                child: ListTile(
+                  leading: Icon(Icons.wifi),
+                  title: Text('Skonfiguruj Wi-Fi'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: ListTile(
+                  leading: Icon(Icons.logout),
+                  title: Text('Wyloguj się'),
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.add_box),
-            tooltip: 'Dodaj nowy kontroler',
-            onPressed: navigateToDiscoverDevices,
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Dodaj nową szklarnię',
-            onPressed: _addNewGreenhouseDialog,
-          ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: logout),
         ],
       ),
-      body: Center(
-        child: FutureBuilder<List<Greenhouse>>(
-          future: greenhousesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
-            } else if (snapshot.hasError) {
-              return Text('Błąd: ${snapshot.error}');
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Brak szklarni'),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: navigateToDiscoverDevices,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Dodaj nowy kontroler'),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _addNewGreenhouseDialog,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Dodaj nową szklarnię'),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: navigateToWifiProvisioning,
-                    icon: const Icon(Icons.wifi),
-                    label: const Text('Skonfiguruj Wi-Fi CC3235SF'),
-                  ),
-                ],
-              );
-            } else {
-              final greenhouses = snapshot.data!;
+      body: Stack(
+        children: [
+          FutureBuilder<List<Greenhouse>>(
+            future: greenhousesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return Center(child: Text('Błąd: ${snapshot.error}'));
+              }
+
+              final greenhouses = snapshot.data ?? [];
+
+              if (greenhouses.isEmpty) {
+                return const Center(child: Text('Brak szklarni'));
+              }
+
               return GridView.builder(
                 padding: const EdgeInsets.all(12),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.2,
+                  childAspectRatio: 1,
                 ),
                 itemCount: greenhouses.length,
                 itemBuilder: (context, index) {
                   final greenhouse = greenhouses[index];
                   return GestureDetector(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              GreenhouseViewPage(greenhouse: greenhouse),
-                        ),
-                      );
-                    },
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.home, size: 48),
-                          const SizedBox(height: 8),
-                          Text(
-                            greenhouse.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
+                      if (!editMode) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                GreenhouseViewPage(greenhouse: greenhouse),
                           ),
-                          if (greenhouse.description != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
-                              child: Text(
-                                greenhouse.description!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 14),
-                              ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Najpierw zamknij tryb edycji'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+
+                    child: Stack(
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 1,
+                          child: Card(
+                            color: Colors.green[50],
+                            elevation: 3,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                        ],
-                      ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green[200],
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.home,
+                                    color: Color.fromARGB(255, 14, 72, 16),
+                                    size: 40,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  greenhouse.name,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color.fromARGB(221, 7, 84, 72),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (greenhouse.description != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      greenhouse.description!,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (editMode)
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Column(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.edit,
+                                    color: Colors.blueGrey,
+                                  ),
+                                  onPressed: () =>
+                                      _editGreenhouseNameDialog(greenhouse),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.redAccent,
+                                  ),
+                                  onPressed: () =>
+                                      _deleteGreenhouse(greenhouse),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },
               );
-            }
-          },
-        ),
+            },
+          ),
+
+          Positioned(
+            bottom: 16 + MediaQuery.of(context).viewPadding.bottom,
+            right: 16,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showAddFAB)
+                  Column(
+                    children: [
+                      FloatingActionButton(
+                        heroTag: 'add_greenhouse',
+                        onPressed: _addNewGreenhouseDialog,
+                        child: const Icon(Icons.add),
+                        backgroundColor: Colors.green,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                FloatingActionButton(
+                  heroTag: 'edit_mode',
+                  onPressed: () {
+                    setState(() {
+                      showAddFAB = !showAddFAB;
+                      editMode = showAddFAB;
+                    });
+                  },
+                  child: Icon(showAddFAB ? Icons.close : Icons.edit),
+                  backgroundColor: Colors.blue,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
