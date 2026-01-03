@@ -7,7 +7,7 @@
 #include "zone.h"
 
 #define NUM_ZONES 30
-#define NUM_DEVICES 30
+#define NUM_DEVICES 10
 
 extern Display_Handle display;
 extern sem_t ipEventSyncObj;
@@ -35,24 +35,7 @@ void* regulatorTask(void* pvParameters)
         }
     }
 
-//    zones[0].zoneID = 1;
-//    zones[0].tempEndDevices[0].id = 1;
-//    zones[0].sensorValues.tmpCelsius = 30.0;
-//    zones[0].sensorValues.sensorNodeID = 792660525;
-//    zones[0].tempEndDevices[0].downValue = 24.0;
-//    zones[0].tempEndDevices[0].upValue = 27.0;
-//
-//    zones[1].zoneID = 2;
-//    zones[1].sensorValues.tmpCelsius = 30.0;
-//    zones[1].tempEndDevices[0].id = 3;
-//    zones[1].sensorValues.sensorNodeID = 792660525;
-//    zones[1].tempEndDevices[0].downValue = 26.0;
-//    zones[1].tempEndDevices[0].upValue = 27.0;
-//
-//    zones[1].tempEndDevices[1].id = 1;
-//    zones[1].sensorValues.sensorNodeID = 792660525;
-//    zones[1].tempEndDevices[1].downValue = 18.0;
-//    zones[1].tempEndDevices[1].upValue = 20.0;
+
     Display_printf(display, 0, 0, "regulator here\n");
 
     Task_sleep(500);

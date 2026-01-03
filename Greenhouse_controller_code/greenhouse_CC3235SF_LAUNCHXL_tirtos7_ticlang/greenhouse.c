@@ -128,7 +128,7 @@ void SimpleLinkNetAppEventHandler(SlNetAppEvent_t *pNetAppEvent)
             pthread_attr_init(&pAttrs);
             priParam.sched_priority = 1;
             pthread_attr_setschedparam(&pAttrs, &priParam);
-            pthread_attr_setstacksize(&pAttrs, 6144);
+            pthread_attr_setstacksize(&pAttrs, 8192);
             status = pthread_create(&httpHTLPostThread, &pAttrs, httpHTLPostTask, NULL);
             if (status) { printError("Task create failed (http)", status); }
 
