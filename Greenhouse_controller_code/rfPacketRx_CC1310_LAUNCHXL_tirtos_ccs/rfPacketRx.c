@@ -224,31 +224,6 @@ void *mainThread(void *arg0)
     );
 
 
-    // Display_printf(display, 0, 0, "sth wrong");
-
-//    switch(terminationReason)
-//    {
-//        case RF_EventLastCmdDone:
-//            // A stand-alone radio operation command or the last radio
-//            // operation command in a chain finished.
-//            break;
-//        case RF_EventCmdCancelled:
-//            // Command cancelled before it was started; it can be caused
-//            // by RF_cancelCmd() or RF_flushCmd().
-//            break;
-//        case RF_EventCmdAborted:
-//            // Abrupt command termination caused by RF_cancelCmd() or
-//            // RF_flushCmd().
-//            break;
-//        case RF_EventCmdStopped:
-//            // Graceful command termination caused by RF_cancelCmd() or
-//            // RF_flushCmd().
-//            break;
-//        default:
-//            // Uncaught error event
-//            while(1);
-//    }
-
     uint32_t cmdStatus = ((volatile RF_Op*)&RF_cmdPropRx)->status;
     switch(cmdStatus)
     {
@@ -326,114 +301,12 @@ void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e)
         /* Copy the payload + the status byte to the packet variable */
         memcpy(packet, packetDataPointer, (packetLength + 1));
 
-//        char uartBuffer[32];
-//        int len = snprintf(uartBuffer, sizeof(uartBuffer),
-//                           " %d %d %d \r\n",packet[0], packet[1], packet[2]);
-//        UART_write(uart, uartBuffer, len);
-
         spiQueueSend(packet, packetLength + 1);
 
-
-//        exponent = (packet[0] >> 4) & 0x0F;
-//        value = packet[0] & 0x0F;
-//        result  = (value << 8) | packet[1];
-//        lightLux = 0.01 * pow(2, exponent) * result;
-//        hum = (packet[3] << 8) | packet[2];
-//        humRH = HDC2010_humToIntRelative(hum);
-//        tmp = (packet[5] << 8) | packet[4];
-//        tmpCelsius = HDC2010_tempToFloatCelsius(tmp);
-//        tmpCelsiusInt = (int)tmpCelsius;
-//        tmpCelsiusFraction = (int)((tmpCelsius - tmpCelsiusInt) * 10);
-
-//        char uartBuffer[32];
-//        int len;
-//
-//        len = snprintf(uartBuffer, sizeof(uartBuffer),
-//                    "%d,%d,%d\r\n", packet[10], packet[9], packet[8]);
-//
-//        UART_write(uart, uartBuffer, len);
-
-//        result = SPI_MasterInit();
-//
-//        uint8_t rxData[14] = {0};
-//
-//
-//        SPI_MasterWrite(packet, rxData, 14);
-//        char uartBuffer[32];
-//        int len;
-
-//        len = snprintf(uartBuffer, sizeof(uartBuffer),
-//                       "%d %d %d %d %d\r\n ", packet[6],
-//                       packet[10], packet[11], packet[12], packet[13]);
-//        UART_write(uart, uartBuffer, len);
 
         RFQueue_nextEntry();
     }
 }
-
-/* ------------------- rfTxTaskFxn -------------------
-   Task sends RF packet when g_rfSendFlag is set.
-   This task executes RF_runCmd synchronously.
-*/
-//void rfTxTaskFxn(UArg arg0, UArg arg1)
-//{
-//    (void)arg0; (void)arg1;
-//
-//    while (1)
-//    {
-//        if (g_rfSendFlag)
-//        {
-//            /* grab and clear flag ASAP */
-//            g_rfSendFlag = 0;
-//            char uartBuffer[32];
-//            int len = snprintf(uartBuffer, sizeof(uartBuffer),
-//                               " %d %d\r\n", g_rfTxBuffer[0], g_rfSendFlag);
-//            UART_write(uart, uartBuffer, len);
-//
-//
-//
-//            /* prepare TX buffer & command */
-//            /* pktLen must fit radio config (<= MAX_LENGTH). Using g_rfTxLen. */
-//            if (g_rfTxLen > 0 && g_rfTxLen <= sizeof(g_rfTxBuffer))
-//            {
-//                RF_cmdPropTx.pPkt   = g_rfTxBuffer;
-//                RF_cmdPropTx.pktLen = g_rfTxLen;
-//
-//                /* Transmit (blocking until done) */
-//                RF_EventMask result = RF_runCmd(
-//                    rfHandle,
-//                    (RF_Op*)&RF_cmdPropTx,
-//                    RF_PriorityHigh,
-//                    NULL,
-//                    0
-//                );
-//
-//
-//                /* optional debug on UART */
-////                if (uart)
-////                {
-//                    char dbg[80];
-//                    int n = snprintf(dbg, sizeof(dbg),
-//                                     "RF TX requested, len=%d, RF_runCmd result=0x%08X\r\n",
-//                                     g_rfTxLen, (unsigned)result);
-//                    UART_write(uart, dbg, n);
-////                }
-//            }
-//            else
-//            {
-//                /* invalid length - ignore */
-//            }
-//
-//            /* small delay to avoid busy-looping */
-//            Task_sleep(1);
-//        }
-//        else
-//        {
-//            Task_sleep(10);
-//        }
-//    }
-//}
-
 
 void rfTxTaskFxn(UArg arg0, UArg arg1)
 {
@@ -443,6 +316,7 @@ void rfTxTaskFxn(UArg arg0, UArg arg1)
         {
             g_rfSendFlag = 0;
 
+
             // stop RX
             RF_cancelCmd(rfHandle, rxHandle, 0);
             RF_flushCmd(rfHandle, rxHandle, 0);
@@ -450,6 +324,13 @@ void rfTxTaskFxn(UArg arg0, UArg arg1)
             // prepare TX
             RF_cmdPropTx.pPkt = g_rfTxBuffer;
             RF_cmdPropTx.pktLen = g_rfTxLen;
+
+            char uartBuffer[32];
+            int len = snprintf(uartBuffer, sizeof(uartBuffer),
+                               " rf %d %d %d %d %d %d %d %d %d \r\n", g_rfTxBuffer[0],  g_rfTxBuffer[1],  g_rfTxBuffer[2],  g_rfTxBuffer[3],
+                               g_rfTxBuffer[4],  g_rfTxBuffer[5],  g_rfTxBuffer[6],  g_rfTxBuffer[7],
+                               g_rfTxBuffer[8]);
+            UART_write(uart, uartBuffer, len);
 
             // send TX (blocking)
             RF_runCmd(rfHandle, (RF_Op*)&RF_cmdPropTx,
@@ -487,27 +368,3 @@ float HDC2010_tempToFloatCelsius(uint16_t x)
 {
     return ((float)x * (165.0f / 65536.0f) - 40.0f);
 }
-
-//int SPI_MasterInit(void)
-//{
-//    SPI_Params_init(&spiParams);
-//    spiParams.frameFormat = SPI_POL0_PHA0;
-//    spiParams.dataSize = 8;
-//    spiParams.mode = SPI_MASTER;
-//
-//    spiMaster = SPI_open(CC1310_LAUNCHXL_SPI0, &spiParams);
-//    if(spiMaster == NULL) {
-//        return 1;
-//    }
-//    return 0;
-//}
-//
-//void SPI_MasterWrite(uint8_t *txBuf, uint8_t *rxBuf, size_t len)
-//{
-//    SPI_Transaction transaction;
-//    transaction.count = len;
-//    transaction.txBuf = txBuf;
-//    transaction.rxBuf = rxBuf;
-//    SPI_transfer(spiMaster, &transaction);
-////    SPI_close(spiMaster);
-//}

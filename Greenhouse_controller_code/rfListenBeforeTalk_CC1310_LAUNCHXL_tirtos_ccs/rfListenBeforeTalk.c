@@ -60,7 +60,13 @@
 
 /* I2C Target address */
 #define I2C_TARGET_ADDRESS_HDC2010 (0x40)
-#define I2C_TARGET_ADDRESS_OPT3001 (0x44)
+#define I2C_TARGET_ADDRESS_OPT3001 (0x45)
+#define HDC3022_I2C_ADDR      0x44
+
+/* Measurement commands (datasheet) */
+#define HDC3022_CMD_MEASURE   0x2400   // High repeatability, clock stretching
+
+
 
 /*
  *  ======== HDC Registers ========
@@ -80,7 +86,7 @@
 
 /* Measurement configuration code */
 uint8_t gTxPacketConfigurationHDC[I2C_TX_PACKET_SIZE_CONFIGURATION_HDC] = {0x0E, 0x60, 0x01};
-uint8_t gTxPacketConfigurationOPT[I2C_TX_PACKET_SIZE_CONFIGURATION_OPT] = {0x01, 0xC4, 0x10};
+uint8_t gTxPacketConfigurationOPT[I2C_TX_PACKET_SIZE_CONFIGURATION_OPT] = {0x01, 0xC6, 0x10};
 
 static Display_Handle display;
 
@@ -110,6 +116,9 @@ PIN_Config ledPinTable[] =
 static void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e);
 float HDC2010_tempToFloatCelsius(uint16_t raw);
 uint32_t HDC2010_humToIntRelative(uint16_t x);
+uint8_t hdc3022_crc8(uint8_t *data, uint8_t len);
+float HDC3022_rawToCelsius(uint16_t raw);
+uint8_t HDC3022_rawToRH(uint16_t raw);
 void getUniqueId(uint8_t *idBuf);
 
 /***** Variable declarations *****/
@@ -125,6 +134,8 @@ bool opt_ready = false;
 uint8_t cfgRegAddr = 0x01;
 uint8_t cfgBuf[2];
 uint8_t hdcReg = HDC2010_H_REG;
+uint8_t HDC2010_selection_flag = 0;
+uint8_t HDC3020_selection_flag = 1;
 
 /*
  *  ======== txTaskFunction ========
@@ -238,13 +249,18 @@ void *mainThread(void *arg0)
             while(1);
         }
 
-        i2cTransaction.writeBuf = gTxPacketConfigurationHDC;
-        i2cTransaction.slaveAddress = I2C_TARGET_ADDRESS_HDC2010;
-        if (!I2C_transfer(i2c, &i2cTransaction)) {
-            /* Could not resolve a sensor, error */
-            Display_printf(display, 0, 0, "Error. No HDC sensor found!");
-            while(1);
+        if (HDC2010_selection_flag == 1)
+        {
+            i2cTransaction.writeBuf = gTxPacketConfigurationHDC;
+            i2cTransaction.slaveAddress = I2C_TARGET_ADDRESS_HDC2010;
+            if (!I2C_transfer(i2c, &i2cTransaction)) {
+                /* Could not resolve a sensor, error */
+                Display_printf(display, 0, 0, "Error. No HDC sensor found!");
+                while(1);
+            }
         }
+
+
 
         /* AMBIENT LIGHT MEASUREMENT */
 
@@ -274,48 +290,103 @@ void *mainThread(void *arg0)
         }
         /* HUMIDITY MEASUREMENT */
 
-        i2cTransaction.writeBuf = &hdcReg;
-        i2cTransaction.slaveAddress = I2C_TARGET_ADDRESS_HDC2010;
+        if (HDC2010_selection_flag == 1)
+        {
+            i2cTransaction.writeBuf = &hdcReg;
+            i2cTransaction.slaveAddress = I2C_TARGET_ADDRESS_HDC2010;
 
-        /* Take samples and print them out onto the console */
-        if (I2C_transfer(i2c, &i2cTransaction)) {
-            /*
-            * Extract Lux from the received data;
-            * see HDC2010 datasheet
-            */
-            packet[11] = rxBuffer[0];
-            packet[12] = rxBuffer[1];
-            hum = (rxBuffer[1] << 8) | rxBuffer[0];
-            humRH = HDC2010_humToIntRelative(hum);
-            Display_printf(display, 0, 0, "Sample: %d RH", humRH);
+            /* Take samples and print them out onto the console */
+            if (I2C_transfer(i2c, &i2cTransaction)) {
+                /*
+                * Extract Lux from the received data;
+                * see HDC2010 datasheet
+                */
+                packet[11] = rxBuffer[0];
+                packet[12] = rxBuffer[1];
+                hum = (rxBuffer[1] << 8) | rxBuffer[0];
+                humRH = HDC2010_humToIntRelative(hum);
+                Display_printf(display, 0, 0, "Sample: %d RH", humRH);
+
+            }
+            else {
+                Display_printf(display, 0, 0, "I2C Bus fault.");
+            }
+
+            /* TEMPERATURE MEASUREMENT */
+
+            i2cTransaction.writeBuf = HDC2010_T_REG;
+
+            /* Take samples and print them out onto the console */
+            if (I2C_transfer(i2c, &i2cTransaction)) {
+                /*
+                * Extract Lux from the received data;
+                * see HDC2010 datasheet
+                */
+                packet[13] = rxBuffer[0];
+                packet[14] = rxBuffer[1];
+                tmp = (rxBuffer[1] << 8) | rxBuffer[0];
+                tmpCelsius = HDC2010_tempToFloatCelsius(tmp);
+                tmpCelsiusInt = (int)tmpCelsius;
+                tmpCelsiusFraction = (int)((tmpCelsius - tmpCelsiusInt) * 10);
+                Display_printf(display, 0, 0, "Sample: %d.%d C", tmpCelsiusInt, tmpCelsiusFraction);
+
+            }
+            else {
+                Display_printf(display, 0, 0, "I2C Bus fault.");
+            }
+        }
+
+        if (HDC3020_selection_flag == 1)
+        {
+
+            uint8_t cmd[2];
+            uint8_t rxBuf[6];
+
+            cmd[0] = (HDC3022_CMD_MEASURE >> 8) & 0xFF;
+            cmd[1] = HDC3022_CMD_MEASURE & 0xFF;
+
+            i2cTransaction.slaveAddress = HDC3022_I2C_ADDR;
+            i2cTransaction.writeBuf     = cmd;
+            i2cTransaction.writeCount   = 2;
+            i2cTransaction.readBuf      = rxBuf;
+            i2cTransaction.readCount    = 6;
+
+            if (I2C_transfer(i2c, &i2cTransaction))
+            {
+                /* CRC check */
+                if (hdc3022_crc8(rxBuf, 2) != rxBuf[2] ||
+                    hdc3022_crc8(&rxBuf[3], 2) != rxBuf[5])
+                {
+                    Display_printf(display, 0, 0, "HDC3022 CRC error!");
+                }
+                else
+                {
+                    uint16_t rawTemp = (rxBuf[0] << 8) | rxBuf[1];
+                    uint16_t rawHum  = (rxBuf[3] << 8) | rxBuf[4];
+
+                    float tempC = HDC3022_rawToCelsius(rawTemp);
+                    uint8_t humRH = HDC3022_rawToRH(rawHum);
+
+                    packet[11] = rxBuf[3];
+                    packet[12] = rxBuf[4];
+                    packet[13] = rxBuf[0];
+                    packet[14] = rxBuf[1];
+
+                    Display_printf(display, 0, 0,
+                        "HDC3022: %d.%d C  %d RH",
+                        (int)tempC,
+                        (int)((tempC - (int)tempC) * 10),
+                        humRH);
+                }
+            }
+            else
+            {
+                Display_printf(display, 0, 0, "HDC3022 I2C error");
+            }
 
         }
-        else {
-            Display_printf(display, 0, 0, "I2C Bus fault.");
-        }
 
-        /* TEMPERATURE MEASUREMENT */
 
-        i2cTransaction.writeBuf = HDC2010_T_REG;
-
-        /* Take samples and print them out onto the console */
-        if (I2C_transfer(i2c, &i2cTransaction)) {
-            /*
-            * Extract Lux from the received data;
-            * see HDC2010 datasheet
-            */
-            packet[13] = rxBuffer[0];
-            packet[14] = rxBuffer[1];
-            tmp = (rxBuffer[1] << 8) | rxBuffer[0];
-            tmpCelsius = HDC2010_tempToFloatCelsius(tmp);
-            tmpCelsiusInt = (int)tmpCelsius;
-            tmpCelsiusFraction = (int)((tmpCelsius - tmpCelsiusInt) * 10);
-            Display_printf(display, 0, 0, "Sample: %d.%d C", tmpCelsiusInt, tmpCelsiusFraction);
-
-        }
-        else {
-            Display_printf(display, 0, 0, "I2C Bus fault.");
-        }
 
         I2C_close(i2c);
         Display_printf(display, 0, 0, "I2C closed!\n");
@@ -380,6 +451,31 @@ float HDC2010_tempToFloatCelsius(uint16_t x)
 {
     return ((float)x * (165.0f / 65536.0f) - 40.0f);
 }
+
+uint8_t hdc3022_crc8(uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0xFF;
+    uint8_t i;
+    for (i = 0; i < len; i++)
+    {
+        crc ^= data[i];
+        uint8_t b;
+        for (b = 0; b < 8; b++)
+            crc = (crc & 0x80) ? (crc << 1) ^ 0x31 : (crc << 1);
+    }
+    return crc;
+}
+
+float HDC3022_rawToCelsius(uint16_t raw)
+{
+    return -45.0f + (175.0f * ((float)raw / 65535.0f));
+}
+
+uint8_t HDC3022_rawToRH(uint16_t raw)
+{
+    return (uint8_t)(100.0f * ((float)raw / 65535.0f));
+}
+
 
 void getUniqueId(uint8_t *uid8)
 {

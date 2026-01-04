@@ -80,7 +80,7 @@ router.get('/zones/full', authenticateDevice, async (req, res) => {
       for (const ed of endDevices) {
         if (ed.up_temp !== null || ed.down_temp !== null) {
           tempEndDevices.push({
-            id: ed.id_end_device,
+            id: ed.id_end_device ?? 0,
             upValue: ed.up_temp ?? 0,
             downValue: ed.down_temp ?? 0,
             onOff: ed.end_device_state
@@ -89,7 +89,7 @@ router.get('/zones/full', authenticateDevice, async (req, res) => {
 
         if (ed.up_hum !== null || ed.down_hum !== null) {
           humEndDevices.push({
-            id: ed.id_end_device,
+            id: ed.id_end_device ?? 0, 
             upValue: ed.up_hum ?? 0,
             downValue: ed.down_hum ?? 0,
             onOff: ed.end_device_state
@@ -98,7 +98,7 @@ router.get('/zones/full', authenticateDevice, async (req, res) => {
 
         if (ed.up_light !== null || ed.down_light !== null) {
           lightEndDevices.push({
-            id: ed.id_end_device,
+            id: ed.id_end_device ?? 0,
             upValue: ed.up_light ?? 0,
             downValue: ed.down_light ?? 0,
             onOff: ed.end_device_state
@@ -108,15 +108,15 @@ router.get('/zones/full', authenticateDevice, async (req, res) => {
 
       result.push({
         zoneID: zoneId,
-        sensorValues: sensors[0] || {
-          tmpCelsius: 0,
-          humRH: 0,
-          lightLux: 0,
-          sensorNodeID: 0
+        sensorValues: {
+          tmpCelsius: sensors[0]?.tmpCelsius ?? 0,
+          humRH: sensors[0]?.humRH ?? 0,
+          lightLux: sensors[0]?.lightLux ?? 0,
+          sensorNodeID: sensors[0]?.sensorNodeID?.toString() ?? "0" 
         },
-        tempEndDevices,
-        humEndDevices,
-        lightEndDevices
+        tempEndDevices: tempEndDevices.map(ed => ({ ...ed, id: Number(ed.id) })), 
+        humEndDevices: humEndDevices.map(ed => ({ ...ed, id: Number(ed.id) })),
+        lightEndDevices: lightEndDevices.map(ed => ({ ...ed, id: Number(ed.id) }))
       });
     }
 

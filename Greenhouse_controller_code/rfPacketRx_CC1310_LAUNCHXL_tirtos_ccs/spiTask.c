@@ -66,6 +66,10 @@ void spiTaskFxn(UArg arg0, UArg arg1)
 
             SPI_transfer(spi, &t);
 
+//            char uartBuffer[32];
+//            int len = snprintf(uartBuffer, sizeof(uartBuffer),
+//                               " %d %d %d %d %d %d %d %d\n", rxBuf[0], rxBuf[1], rxBuf[2], rxBuf[3], rxBuf[4], rxBuf[5], rxBuf[6], rxBuf[7], rxBuf[8] );
+//            UART_write(uart, uartBuffer, len);
 
             if (rxBuf[0] != 0)
             {
@@ -75,10 +79,7 @@ void spiTaskFxn(UArg arg0, UArg arg1)
 
                 // Trigger RF TX
                 g_rfSendFlag = 1;
-//                char uartBuffer[32];
-//                int len = snprintf(uartBuffer, sizeof(uartBuffer),
-//                                   " %d %d %d %d %d %d %d %d \r\n", rxBuf[14], rxBuf[1], rxBuf[2], rxBuf[3], rxBuf[4], rxBuf[5], rxBuf[6], rxBuf[7] );
-//                UART_write(uart, uartBuffer, len);
+
             }
 
 
