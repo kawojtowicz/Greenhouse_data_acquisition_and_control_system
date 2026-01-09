@@ -883,6 +883,67 @@ router.post('/end-devices/unassign-zone', isUserAuthenticated, async (req, res) 
   }
 });
 
+router.post('/sensors/update-name', isUserAuthenticated, async (req, res) => {
+  const { id_sensor_node, new_name } = req.body;
+
+  if (!id_sensor_node || !new_name || new_name.trim() === '') {
+    return res.status(400).json({ message: 'id_sensor_node i new_name wymagane' });
+  }
+
+  try {
+    const check = await db.query(`
+      SELECT s.id_sensor_node
+      FROM Sensor_nodes s
+      JOIN Zones z ON s.id_zone = z.id_zone
+      JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE s.id_sensor_node = $1 AND g.id_user = $2
+    `, [id_sensor_node, req.session.user.id]);
+
+    if (check.rows.length === 0)
+      return res.status(403).json({ message: 'Dostęp zabroniony' });
+
+    await db.query(
+      'UPDATE Sensor_nodes SET sensor_node_name = $1 WHERE id_sensor_node = $2',
+      [new_name, id_sensor_node]
+    );
+
+    res.json({ message: 'Nazwa czujnika zaktualizowana' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+router.post('/end-devices/update-name', isUserAuthenticated, async (req, res) => {
+  const { id_end_device, new_name } = req.body;
+
+  if (!id_end_device || !new_name || new_name.trim() === '') {
+    return res.status(400).json({ message: 'id_end_device i new_name wymagane' });
+  }
+
+  try {
+    const check = await db.query(`
+      SELECT ed.id_end_device
+      FROM End_devices ed
+      JOIN Zones z ON ed.id_zone = z.id_zone
+      JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE ed.id_end_device = $1 AND g.id_user = $2
+    `, [id_end_device, req.session.user.id]);
+
+    if (check.rows.length === 0)
+      return res.status(403).json({ message: 'Dostęp zabroniony' });
+
+    await db.query(
+      'UPDATE End_devices SET end_device_name = $1 WHERE id_end_device = $2',
+      [new_name, id_end_device]
+    );
+
+    res.json({ message: 'Nazwa urządzenia zaktualizowana' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
 
 
 module.exports = router;
