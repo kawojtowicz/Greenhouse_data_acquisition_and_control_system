@@ -275,6 +275,35 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
   }
 });
 
+// router.get('/zones', isUserAuthenticated, async (req, res) => {
+//   const greenhouseId = req.query.greenhouse_id;
+//   if (!greenhouseId) return res.status(400).json({ message: 'greenhouse_id required' });
+
+//   try {
+//     const result = await db.query(`
+//       SELECT 
+//         z.id_zone,
+//         z.zone_name,
+//         z.id_greenhouse_controller,
+//         z.id_greenhouse,
+//         z.x,
+//         z.y,
+//         z.width,
+//         z.height,
+//         g.greenhouse_name
+//       FROM Zones z
+//       JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+//       WHERE z.id_greenhouse = $1 AND g.id_user = $2
+//       ORDER BY z.id_zone
+//     `, [greenhouseId, req.session.user.id]);
+
+//     res.json({ zones: result.rows });
+//   } catch (err) {
+//     console.error('Error fetching zones:', err);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// });
+
 router.get('/zones', isUserAuthenticated, async (req, res) => {
   const greenhouseId = req.query.greenhouse_id;
   if (!greenhouseId) return res.status(400).json({ message: 'greenhouse_id required' });
@@ -285,6 +314,7 @@ router.get('/zones', isUserAuthenticated, async (req, res) => {
         z.id_zone,
         z.zone_name,
         z.id_greenhouse_controller,
+        gc.device_id AS controller_device_id,
         z.id_greenhouse,
         z.x,
         z.y,
@@ -292,7 +322,10 @@ router.get('/zones', isUserAuthenticated, async (req, res) => {
         z.height,
         g.greenhouse_name
       FROM Zones z
-      JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      LEFT JOIN Greenhouse_controllers gc
+        ON z.id_greenhouse_controller = gc.id_greenhouse_controller
+      JOIN Greenhouses g 
+        ON z.id_greenhouse = g.id_greenhouse
       WHERE z.id_greenhouse = $1 AND g.id_user = $2
       ORDER BY z.id_zone
     `, [greenhouseId, req.session.user.id]);
@@ -303,6 +336,7 @@ router.get('/zones', isUserAuthenticated, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 
 router.get('/greenhouses/:controllerId/zones', isUserAuthenticated, async (req, res) => {
