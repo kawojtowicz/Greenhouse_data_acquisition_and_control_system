@@ -898,6 +898,7 @@ router.post('/sensors/unassign-zone', isUserAuthenticated, async (req, res) => {
   }
 
   try {
+  
 
     const check = await db.query(`
       SELECT s.id_sensor_node
