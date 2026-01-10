@@ -21,6 +21,7 @@ class ZoneRect {
   double width;
   double height;
   String name;
+  String? assignedController;
 
   ZoneRect({
     this.id,
@@ -29,12 +30,13 @@ class ZoneRect {
     required this.width,
     required this.height,
     required this.name,
+    this.assignedController,
   });
 }
 
 class SensorTile {
   final int id;
-  final String name;
+  String name;
   double x;
   double y;
   final dynamic temperature;
@@ -59,7 +61,7 @@ class SensorTile {
 
 class EndDeviceTile {
   final int id;
-  final String name;
+  String name;
   double x;
   double y;
   final double? upTemp;
@@ -147,6 +149,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   }
 
   Future<void> _editEndDevice(EndDeviceTile device) async {
+    final nameCtrl = TextEditingController(text: device.name);
     final upTempCtrl = TextEditingController(text: device.upTemp?.toString());
     final downTempCtrl = TextEditingController(
       text: device.downTemp?.toString(),
@@ -165,6 +168,20 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
         content: SingleChildScrollView(
           child: Column(
             children: [
+              Text(
+                'ID: ${device.id}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Nazwa urządzenia',
+                ),
+              ),
+              const SizedBox(height: 12),
+
               _numField('Temp ↑', upTempCtrl),
               _numField('Temp ↓', downTempCtrl),
               _numField('Wilg ↑', upHumCtrl),
@@ -174,6 +191,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
             ],
           ),
         ),
+
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -181,6 +199,16 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final newName = nameCtrl.text.trim();
+              if (newName.isEmpty) return;
+
+              if (newName != device.name) {
+                await ApiService().updateEndDeviceName(device.id, newName);
+                setState(() {
+                  device.name = newName;
+                });
+              }
+
               await ApiService().updateEndDeviceParams(
                 id: device.id,
                 upTemp: double.tryParse(upTempCtrl.text),
@@ -192,9 +220,8 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
               );
 
               Navigator.pop(context);
-              _fetchEndDevices();
-              setState(() {});
             },
+
             child: const Text('Zapisz'),
           ),
         ],
@@ -272,6 +299,69 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
     } catch (e) {
       print('Błąd przy przypisywaniu kontrolera: $e');
     }
+  }
+
+  void _showGreenhouseInfo() {
+    final int zoneCount = zones.length;
+
+    final int sensorsAssignedToZones = sensors.length;
+
+    final int endDevicesAssigned = endDevices.length;
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.eco, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Informacje o szklarni'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _infoRow('Nazwa', widget.greenhouse.name),
+            _infoRow(
+              'Opis',
+              widget.greenhouse.description?.isNotEmpty == true
+                  ? widget.greenhouse.description!
+                  : 'Brak opisu',
+            ),
+            const Divider(),
+            _infoRow('Liczba stref', zoneCount.toString()),
+            _infoRow('Czujniki', sensorsAssignedToZones.toString()),
+            _infoRow('Urządzenia ', endDevicesAssigned.toString()),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Zamknij'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(flex: 6, child: Text(value)),
+        ],
+      ),
+    );
   }
 
   Future<void> _fetchEndDevices() async {
@@ -399,6 +489,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
               width: z.width.toDouble(),
               height: z.height.toDouble(),
               name: z.name,
+              assignedController: z.controllerDeviceId ?? '⚠ Brak!',
             ),
           )
           .toList();
@@ -469,6 +560,52 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
     );
 
     setState(() => changeLocationMode = false);
+  }
+
+  Future<void> _editSensor(SensorTile sensor) async {
+    final nameCtrl = TextEditingController(text: sensor.name);
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Edycja sensora'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ID: ${sensor.id}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Nazwa sensora'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Anuluj'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = nameCtrl.text.trim();
+              if (newName.isEmpty) return;
+
+              await ApiService().updateSensorName(sensor.id, newName);
+
+              setState(() {
+                sensor.name = newName;
+              });
+
+              Navigator.pop(context);
+            },
+            child: const Text('Zapisz'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onZoneStart(DragStartDetails d) {
@@ -543,7 +680,17 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.greenhouse.name)),
+      appBar: AppBar(
+        title: Text(widget.greenhouse.name),
+        actions: [
+          IconButton(
+            tooltip: 'Informacje o szklarni',
+            icon: const Icon(Icons.help_outline),
+            onPressed: _showGreenhouseInfo,
+          ),
+        ],
+      ),
+
       body: RefreshIndicator(
         onRefresh: _fetchAll,
         child: Column(
@@ -668,7 +815,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                             ),
                             IconButton(
                               icon: const Icon(
-                                Icons.device_hub,
+                                Icons.edit,
                                 color: Colors.blue,
                                 size: 20,
                               ),
@@ -760,6 +907,8 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   }
 
   Widget _buildSensorTile(SensorTile sensor) {
+    final double tileWidth = editMode ? 180 : (sensor.isExpanded ? 160 : 100);
+
     return Stack(
       children: [
         GestureDetector(
@@ -771,8 +920,9 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
             }
           },
           child: Container(
-            width: 100,
-            padding: const EdgeInsets.all(8),
+            width: tileWidth,
+            padding: EdgeInsets.fromLTRB(8, 8, editMode ? 40 : 8, 8),
+
             decoration: BoxDecoration(
               color: Colors.blueAccent.withOpacity(0.7),
               borderRadius: BorderRadius.circular(10),
@@ -796,6 +946,16 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                      if (editMode)
+                        Text(
+                          'ID: ${sensor.id}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+
                       if (sensor.temperature != null)
                         Text(
                           sensor.isExpanded
@@ -837,20 +997,38 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
           Positioned(
             top: 0,
             right: 0,
-            child: IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-              tooltip: 'Odłącz od strefy',
-              onPressed: () async {
-                try {
-                  await ApiService().unassignSensorFromZone(sensor.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Sensor odłączony od strefy')),
-                  );
-                  _fetchAll();
-                } catch (e) {
-                  print('Error unassigning sensor: $e');
-                }
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete,
+                    color: Color.fromARGB(255, 236, 62, 50),
+                    size: 18,
+                  ),
+                  tooltip: 'Odłącz od strefy',
+                  onPressed: () async {
+                    try {
+                      await ApiService().unassignSensorFromZone(sensor.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Sensor odłączony od strefy'),
+                        ),
+                      );
+                      _fetchAll();
+                    } catch (e) {
+                      print('Error unassigning sensor: $e');
+                    }
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.white, size: 18),
+                  tooltip: 'Edytuj sensor',
+                  onPressed: () {
+                    _editSensor(sensor);
+                  },
+                ),
+              ],
             ),
           ),
       ],
@@ -858,6 +1036,8 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   }
 
   Widget _buildEndDeviceTile(EndDeviceTile device) {
+    final double tileWidth = editMode ? 150 : (device.isExpanded ? 180 : 100);
+
     String lightDisplay(double? light, double? upTemp, double? downTemp) {
       if (light == null) return '-';
       if (upTemp != null && light > upTemp) return 'Wyłącz';
@@ -878,10 +1058,10 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
       child: Stack(
         children: [
           Container(
-            width: 100,
-            padding: const EdgeInsets.all(6),
+            width: tileWidth,
+            padding: EdgeInsets.fromLTRB(6, 6, editMode ? 40 : 6, 6),
             decoration: BoxDecoration(
-              color: Colors.purple.withOpacity(0.7),
+              color: const Color.fromARGB(255, 74, 0, 126).withOpacity(0.7),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -902,6 +1082,16 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                             color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                      if (editMode)
+                        Text(
+                          'ID: ${device.id}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
                           ),
                         ),
 
@@ -976,22 +1166,38 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
             Positioned(
               top: 0,
               right: 0,
-              child: IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-                tooltip: 'Odłącz od strefy',
-                onPressed: () async {
-                  try {
-                    await ApiService().unassignEndDeviceFromZone(device.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Urządzenie odłączone od strefy'),
-                      ),
-                    );
-                    _fetchEndDevices();
-                  } catch (e) {
-                    print('Error unassigning end device: $e');
-                  }
-                },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Color.fromARGB(255, 245, 70, 57),
+                      size: 18,
+                    ),
+                    tooltip: 'Odłącz od strefy',
+                    onPressed: () async {
+                      try {
+                        await ApiService().unassignEndDeviceFromZone(device.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Urządzenie odłączone od strefy'),
+                          ),
+                        );
+                        _fetchEndDevices();
+                      } catch (e) {
+                        print('Error unassigning end device: $e');
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.white, size: 18),
+                    tooltip: 'Edytuj urządzenie',
+                    onPressed: () {
+                      _editEndDevice(device);
+                    },
+                  ),
+                ],
               ),
             ),
         ],
@@ -1020,7 +1226,7 @@ class ZonesPainter extends CustomPainter {
       final height = z.height.abs();
 
       canvas.drawRect(Rect.fromLTWH(x, y, width, height), paint);
-      _drawZoneName(canvas, z.name, x, y, width, height);
+      _drawZoneName(canvas, z.name, x, y, width, height, z.assignedController);
     }
 
     if (current != null) {
@@ -1041,34 +1247,64 @@ class ZonesPainter extends CustomPainter {
     double x,
     double y,
     double width,
-    double height,
-  ) {
-    if (name.isEmpty) return;
+    double height, [
+    String? controllerName,
+  ]) {
+    if (name.isNotEmpty) {
+      final textSpan = TextSpan(
+        text: name,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+      );
 
-    final textSpan = TextSpan(
-      text: name,
-      style: const TextStyle(
-        color: Colors.black87,
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-      ),
-    );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '...',
+      );
 
-    final textPainter = TextPainter(
-      text: textSpan,
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-      ellipsis: '...',
-    );
+      textPainter.layout(minWidth: 0, maxWidth: width);
+      final offset = Offset(
+        x + (width - textPainter.width) / 2,
+        y + (height - textPainter.height) / 2 - 8,
+      );
 
-    textPainter.layout(minWidth: 0, maxWidth: width);
-    final offset = Offset(
-      x + (width - textPainter.width) / 2,
-      y + (height - textPainter.height) / 2,
-    );
+      textPainter.paint(canvas, offset);
+    }
 
-    textPainter.paint(canvas, offset);
+    if (controllerName != null || controllerName == null && name.isNotEmpty) {
+      final controllerText = 'Kontroler: ${controllerName}' ?? '⚠ Brak!';
+      final controllerSpan = TextSpan(
+        text: controllerText,
+        style: TextStyle(
+          color: controllerName == null ? Colors.red : Colors.blue,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      );
+
+      final controllerPainter = TextPainter(
+        text: controllerSpan,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '...',
+      );
+
+      controllerPainter.layout(minWidth: 0, maxWidth: width);
+
+      final controllerOffset = Offset(
+        x + (width - controllerPainter.width) / 2,
+        y + height - controllerPainter.height - 2,
+      );
+
+      controllerPainter.paint(canvas, controllerOffset);
+    }
   }
 
   @override

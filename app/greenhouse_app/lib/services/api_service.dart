@@ -16,6 +16,7 @@ class ApiService {
   final String baseUrl =
       'https://greenhouse-data-acquisition-and-control.onrender.com';
   // 'http://192.168.0.101:3000';
+  // 'http://192.168.1.38:3000';
 
   Future<bool> logoutUser(BuildContext context) async {
     try {
@@ -476,5 +477,19 @@ class ApiService {
       print('Error unassigning end device: $e');
       throw e;
     }
+  }
+
+  Future<void> updateSensorName(int id, String newName) async {
+    await dio.post(
+      '$baseUrl/users/sensors/update-name',
+      data: {'id_sensor_node': id, 'new_name': newName},
+    );
+  }
+
+  Future<void> updateEndDeviceName(int id, String newName) async {
+    await dio.post(
+      '$baseUrl/users/end-devices/update-name',
+      data: {'id_end_device': id, 'new_name': newName},
+    );
   }
 }

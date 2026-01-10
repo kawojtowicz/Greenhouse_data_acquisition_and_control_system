@@ -143,16 +143,28 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _editGreenhouseNameDialog(Greenhouse greenhouse) async {
+  Future<void> _editGreenhouseDialog(Greenhouse greenhouse) async {
     final nameController = TextEditingController(text: greenhouse.name);
+    final descriptionController = TextEditingController(
+      text: greenhouse.description ?? '',
+    );
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Edytuj nazwę szklarni'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: 'Nowa nazwa'),
+        title: const Text('Edytuj szklarnię'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nazwa'),
+            ),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(labelText: 'Opis'),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -162,15 +174,29 @@ class _HomePageState extends State<HomePage> {
           ElevatedButton(
             onPressed: () async {
               final newName = nameController.text.trim();
-              if (newName.isEmpty) return;
+              final newDescription = descriptionController.text.trim();
+
+              if (newName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Nazwa nie może być pusta')),
+                );
+                return;
+              }
 
               Navigator.pop(context);
-              await api.updateGreenhouseName(greenhouse.id, newName);
+
+              await ApiService().updateGreenhouseName(
+                greenhouse.id,
+                newName,
+                newDescription.isEmpty ? null : newDescription,
+              );
+
               setState(() {
-                greenhousesFuture = api.fetchUserGreenhouses();
+                greenhousesFuture = ApiService().fetchUserGreenhouses();
               });
+
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Nazwa szklarni zaktualizowana')),
+                const SnackBar(content: Text('Szklarnia zaktualizowana')),
               );
             },
             child: const Text('Zapisz'),
@@ -218,7 +244,7 @@ class _HomePageState extends State<HomePage> {
                 value: 'unassigned_devices',
                 child: ListTile(
                   leading: Icon(Icons.sensors_off),
-                  title: Text('Nieprzypisane czujniki'),
+                  title: Text('Nieprzypisane urządzenia'),
                 ),
               ),
               const PopupMenuItem(
@@ -323,10 +349,16 @@ class _HomePageState extends State<HomePage> {
                                     color: Color.fromARGB(221, 7, 84, 72),
                                   ),
                                   textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
+
                                 if (greenhouse.description != null)
                                   Padding(
-                                    padding: const EdgeInsets.only(top: 4.0),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8.0,
+                                      vertical: 4.0,
+                                    ),
                                     child: Text(
                                       greenhouse.description!,
                                       textAlign: TextAlign.center,
@@ -334,6 +366,8 @@ class _HomePageState extends State<HomePage> {
                                         fontSize: 12,
                                         color: Colors.black54,
                                       ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                               ],
@@ -352,7 +386,7 @@ class _HomePageState extends State<HomePage> {
                                     color: Colors.blueGrey,
                                   ),
                                   onPressed: () =>
-                                      _editGreenhouseNameDialog(greenhouse),
+                                      _editGreenhouseDialog(greenhouse),
                                 ),
                                 IconButton(
                                   icon: const Icon(
