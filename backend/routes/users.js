@@ -327,7 +327,7 @@ router.get('/zones', isUserAuthenticated, async (req, res) => {
       JOIN Greenhouses g 
         ON z.id_greenhouse = g.id_greenhouse
       WHERE z.id_greenhouse = $1 AND g.id_user = $2
-      ORDER BY z.id_zone
+      ORDER BY z.id_zone 
     `, [greenhouseId, req.session.user.id]);
 
     res.json({ zones: result.rows });
@@ -561,31 +561,66 @@ router.get('/zones/all', isUserAuthenticated, async (req, res) => {
 });
 
 
-router.get('/:id/sensors/all', isUserAuthenticated, async (req, res) => {
+// router.get('/:id/sensors/all', isUserAuthenticated, async (req, res) => {
+//   const greenhouseId = req.params.id;
+
+//   try {
+//     const check = await db.query('SELECT id_greenhouse FROM Greenhouses WHERE id_greenhouse = $1 AND id_user = $2', [greenhouseId, req.session.user.id]);
+//     if (check.rows.length === 0) return res.status(403).json({ message: 'Access denied' });
+
+//     const sensors = await db.query(`
+//       SELECT
+//         sn.id_sensor_node,
+//         sn.sensor_node_name,
+//         sn.x,
+//         sn.y,
+//         (SELECT temperature FROM htl_logs WHERE id_sensor_node = sn.id_sensor_node ORDER BY log_time DESC LIMIT 1) AS temperature,
+//         (SELECT humidity FROM htl_logs WHERE id_sensor_node = sn.id_sensor_node ORDER BY log_time DESC LIMIT 1) AS humidity,
+//         (SELECT light FROM htl_logs WHERE id_sensor_node = sn.id_sensor_node ORDER BY log_time DESC LIMIT 1) AS light
+//       FROM Sensor_nodes sn
+//       JOIN Zones z ON sn.id_zone = z.id_zone
+//       WHERE z.id_greenhouse = $1
+//       ORDER BY sn.id_sensor_node
+//     `, [greenhouseId]);
+
+//     res.json(sensors.rows);
+//   } catch (err) {
+//     console.error('Error fetching all sensors for greenhouse:', err);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// });
+router.get('/:id/zones/with-last-log', isUserAuthenticated, async (req, res) => {
   const greenhouseId = req.params.id;
 
   try {
-    const check = await db.query('SELECT id_greenhouse FROM Greenhouses WHERE id_greenhouse = $1 AND id_user = $2', [greenhouseId, req.session.user.id]);
+    const check = await db.query(
+      'SELECT id_greenhouse FROM Greenhouses WHERE id_greenhouse = $1 AND id_user = $2',
+      [greenhouseId, req.session.user.id]
+    );
     if (check.rows.length === 0) return res.status(403).json({ message: 'Access denied' });
 
-    const sensors = await db.query(`
-      SELECT
-        sn.id_sensor_node,
-        sn.sensor_node_name,
-        sn.x,
-        sn.y,
-        (SELECT temperature FROM htl_logs WHERE id_sensor_node = sn.id_sensor_node ORDER BY log_time DESC LIMIT 1) AS temperature,
-        (SELECT humidity FROM htl_logs WHERE id_sensor_node = sn.id_sensor_node ORDER BY log_time DESC LIMIT 1) AS humidity,
-        (SELECT light FROM htl_logs WHERE id_sensor_node = sn.id_sensor_node ORDER BY log_time DESC LIMIT 1) AS light
-      FROM Sensor_nodes sn
-      JOIN Zones z ON sn.id_zone = z.id_zone
+    const zones = await db.query(`
+      SELECT 
+        z.id_zone,
+        z.zone_name,
+        z.x,
+        z.y,
+        z.width,
+        z.height,
+        gc.device_id AS controller_device_id,
+        MAX(h.log_time) AS last_log_time
+      FROM Zones z
+      LEFT JOIN Sensor_nodes sn ON sn.id_zone = z.id_zone
+      LEFT JOIN htl_logs h ON h.id_sensor_node = sn.id_sensor_node
+      LEFT JOIN Greenhouse_controllers gc ON gc.id_greenhouse_controller = z.id_greenhouse_controller
       WHERE z.id_greenhouse = $1
-      ORDER BY sn.id_sensor_node
+      GROUP BY z.id_zone, gc.device_id
+      ORDER BY z.id_zone
     `, [greenhouseId]);
 
-    res.json(sensors.rows);
+    res.json(zones.rows);
   } catch (err) {
-    console.error('Error fetching all sensors for greenhouse:', err);
+    console.error('Error fetching zones with last log:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
