@@ -6,7 +6,9 @@
 #include <ti/drivers/UART.h>
 #include <stdio.h>
 
+
 #include "spiQueue.h"
+#include "rfTxQueue.h"
 #include "Board.h"
 
 #define SPI_TASK_STACK 2048
@@ -71,15 +73,40 @@ void spiTaskFxn(UArg arg0, UArg arg1)
 //                               " %d %d %d %d %d %d %d %d\n", rxBuf[0], rxBuf[1], rxBuf[2], rxBuf[3], rxBuf[4], rxBuf[5], rxBuf[6], rxBuf[7], rxBuf[8] );
 //            UART_write(uart, uartBuffer, len);
 
-            if (rxBuf[0] != 0)
+//            if (!(rxBuf[0] == 2 &&
+//                  rxBuf[1] == 0 &&
+//                  rxBuf[2] == 0 &&
+//                  rxBuf[3] == 0 &&
+//                  rxBuf[4] == 0 &&
+//                  rxBuf[5] == 0 &&
+//                  rxBuf[6] == 0 &&
+//                  rxBuf[7] == 0 &&
+//                  rxBuf[8] == 0))
+//            {
+//                g_rfTxLen = 9;
+//                // Copy SPI data into RF TX buffer                // or the actual length of meaningful data
+//                memcpy(g_rfTxBuffer, rxBuf, g_rfTxLen);
+//
+//                // Trigger RF TX
+//                g_rfSendFlag = 1;
+//
+//            }
+            static const uint8_t emptyFrame[9] = { 0,0,0,0,0,0,0,0,0};
+
+            if (memcmp(rxBuf, emptyFrame, 9) != 0)
             {
-                g_rfTxLen = 15;
-                // Copy SPI data into RF TX buffer                // or the actual length of meaningful data
-                memcpy(g_rfTxBuffer, rxBuf, g_rfTxLen);
+                RfTxMsg_t *msg = malloc(sizeof(RfTxMsg_t));
+                if (msg != NULL)
+                {
+                    if (rxBuf[8] == 2)
+                    {
+                        rxBuf[8] = 0;
+                    }
+                    msg->len = 9;
+                    memcpy(msg->data, rxBuf, 9);
 
-                // Trigger RF TX
-                g_rfSendFlag = 1;
-
+                    Queue_put(rfTxQueue, &msg->_elem);
+                }
             }
 
 

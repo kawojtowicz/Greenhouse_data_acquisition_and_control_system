@@ -19,6 +19,6 @@ void spiQueueSend(uint8_t *packet, uint8_t len)
     SpiMsg_t *msg = malloc(sizeof(SpiMsg_t));
     memcpy(msg->data, packet, 15);
     Queue_put(spiQueue, &msg->elem);
-    UART_write(uart, "Enqueued SPI packet\n", 20);
+//    UART_write(uart, "Enqueued SPI packet\n", 20);
 
 }

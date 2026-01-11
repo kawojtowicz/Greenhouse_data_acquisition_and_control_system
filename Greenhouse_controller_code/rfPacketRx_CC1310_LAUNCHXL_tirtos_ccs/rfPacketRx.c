@@ -12,7 +12,7 @@
 #include <ti/drivers/SPI.h>
 #include <ti/drivers/GPIO.h>
 #include "spiQueue.h"
-#include "txQueue.h"
+#include "rfTxQueue.h"
 #include <ti/sysbios/knl/Task.h>
 
 
@@ -62,6 +62,8 @@ uint8_t tmpCelsiusInt;
 uint8_t tmpCelsiusFraction;
 uint8_t value;
 RF_CmdHandle rxHandle;
+Queue_Struct rfTxQueueStruct;
+Queue_Handle rfTxQueue;
 
 /* Pin driver handle */
 static PIN_Handle ledPinHandle;
@@ -123,6 +125,8 @@ PIN_Config pinTable[] =
 
 /***** Function definitions *****/
 
+
+
 void *mainThread(void *arg0)
 {
     RF_Params rfParams;
@@ -175,7 +179,9 @@ void *mainThread(void *arg0)
 
     spiQueueInit();
     spiTaskInit();
-    txQueueInit();
+    rfTxQueueInit();
+
+//    txQueueInit();
 //    txTaskInit();
 
     /* Modify CMD_PROP_RX command for application needs */
@@ -308,46 +314,58 @@ void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e)
     }
 }
 
+
 void rfTxTaskFxn(UArg arg0, UArg arg1)
 {
-    while(1)
+    while (1)
     {
-        if (g_rfSendFlag)
+        if (!Queue_empty(rfTxQueue))
         {
-            g_rfSendFlag = 0;
+            RfTxMsg_t *msg = (RfTxMsg_t *)Queue_get(rfTxQueue);
 
-
-            // stop RX
+            /* --- STOP RX --- */
             RF_cancelCmd(rfHandle, rxHandle, 0);
             RF_flushCmd(rfHandle, rxHandle, 0);
 
-            // prepare TX
-            RF_cmdPropTx.pPkt = g_rfTxBuffer;
-            RF_cmdPropTx.pktLen = g_rfTxLen;
+            /* --- PREPARE TX --- */
+            RF_cmdPropTx.pPkt   = msg->data;
+            RF_cmdPropTx.pktLen = msg->len;
 
-            char uartBuffer[32];
-            int len = snprintf(uartBuffer, sizeof(uartBuffer),
-                               " rf %d %d %d %d %d %d %d %d %d \r\n", g_rfTxBuffer[0],  g_rfTxBuffer[1],  g_rfTxBuffer[2],  g_rfTxBuffer[3],
-                               g_rfTxBuffer[4],  g_rfTxBuffer[5],  g_rfTxBuffer[6],  g_rfTxBuffer[7],
-                               g_rfTxBuffer[8]);
-            UART_write(uart, uartBuffer, len);
+//            /* DEBUG (opcjonalnie) */
+//            char uartBuffer[64];
+//            int len = snprintf(
+//                uartBuffer,
+//                sizeof(uartBuffer),
+//                "RF TX: %d %d %d %d %d %d %d %d %d\r\n",
+//                msg->data[0], msg->data[1], msg->data[2],
+//                msg->data[3], msg->data[4], msg->data[5],
+//                msg->data[6], msg->data[7], msg->data[8]
+//            );
+//            UART_write(uart, uartBuffer, len);
 
-            // send TX (blocking)
-            RF_runCmd(rfHandle, (RF_Op*)&RF_cmdPropTx,
-                      RF_PriorityHigh, NULL, 0);
+            /* --- SEND TX (blocking) --- */
+            RF_runCmd(rfHandle,
+                      (RF_Op*)&RF_cmdPropTx,
+                      RF_PriorityHigh,
+                      NULL,
+                      0);
 
-            // restart RX
-            rxHandle = RF_postCmd(rfHandle,
-                                  (RF_Op*)&RF_cmdPropRx,
-                                  RF_PriorityNormal,
-                                  &callback,
-                                  RF_EventRxEntryDone);
+            /* --- RESTART RX --- */
+            rxHandle = RF_postCmd(
+                rfHandle,
+                (RF_Op*)&RF_cmdPropRx,
+                RF_PriorityNormal,
+                &callback,
+                RF_EventRxEntryDone
+            );
+
+            /* --- FREE MESSAGE --- */
+            free(msg);
         }
 
-        Task_sleep(10);
+        Task_sleep(5);
     }
 }
-
 
 /*
  *  ======== HDC2010_humToIntRelative ========

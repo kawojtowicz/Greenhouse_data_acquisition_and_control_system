@@ -11,7 +11,7 @@
 #include <ti/sysbios/knl/Queue.h>
 #include <stdint.h>
 
-#define RF_TX_MAX_LEN 30
+#define RF_TX_MAX_LEN 9
 
 typedef struct {
     Queue_Elem _elem;
