@@ -9,6 +9,7 @@
 #include <ti/drivers/SPI.h>
 #include <ti/sysbios/knl/Task.h>
 #include "spiQueue.h"
+#include "spiTxQueue.h"
 
 
 extern Display_Handle display;
@@ -17,8 +18,9 @@ extern sem_t ipEventSyncObj;
 /* SPI slave handle */
 SPI_Handle spiSlave;
 SPI_Params spiParams;
-extern uint32_t spiReady;
-extern uint8_t txBuf;
+extern uint8_t spiReady;
+extern uint8_t txBuf[15];
+
 
 
 void SPI_SlaveInit(void)
@@ -37,6 +39,7 @@ void SPI_SlaveInit(void)
 void SPI_SlaveReceive(uint8_t *rxBuf, uint8_t *txBuf, size_t len)
 {
     SPI_Transaction transaction;
+    memset(&transaction, 0, sizeof(transaction));
     transaction.count = len;
     transaction.txBuf = txBuf;
     transaction.rxBuf = rxBuf;
@@ -46,15 +49,17 @@ void SPI_SlaveReceive(uint8_t *rxBuf, uint8_t *txBuf, size_t len)
 void* spiTask(void* pvParameters)
 {
     spi_message_t msg;
-    SPI_init();
+
+//    SPI_init();
 
     SPI_SlaveInit();
     Task_sleep(50);
 
     while(1) {
 
-    SPI_SlaveReceive(msg.data, &txBuf, 15);
-    Display_printf(display, 0, 0, "sth reveived\n");
+      SPI_SlaveReceive(msg.data, txBuf, 15);
+//    SPI_SlaveReceive(msg.data, txBuf, 15);
+//    Display_printf(display, 0, 0, "sth reveived\n");
     spiReady = 0;
     if (msg.data[0] != 2)
     {
@@ -66,7 +71,13 @@ void* spiTask(void* pvParameters)
                    msg.data[0], msg.data[1], msg.data[2], msg.data[3], msg.data[4], msg.data[5],
                    msg.data[6], msg.data[7], msg.data[8], msg.data[9], msg.data[10], msg.data[11],
                    msg.data[12], msg.data[13], msg.data[14]);
+
+    Display_printf(display, 0, 0, "SPI sent: %d %d %d %d %d %d %d %d %d \n",
+                   txBuf[0], txBuf[1], txBuf[2], txBuf[3], txBuf[4], txBuf[5], txBuf[6], txBuf[7], txBuf[8]);
     }
+
+
+
 
     return(0);
 }

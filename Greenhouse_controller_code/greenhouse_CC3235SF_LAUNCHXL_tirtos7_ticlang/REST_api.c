@@ -13,9 +13,9 @@
 
 //#define HOSTNAME              "http://192.168.0.101/:3000"
 //#define HOSTNAME              "http://10.24.190.62:3000"
-//#define HOSTNAME              "http://192.168.0.102:3000"
-//#define HOSTNAME              "http://192.168.0.101:3000"
 #define HOSTNAME              "http://192.168.1.38:3000"
+//#define HOSTNAME              "http://192.168.0.101:3000"
+//#define HOSTNAME              "http://10.198.63.62:3000"
 //#define HOSTNAME              "https://greenhouse-data-acquisition-and-control.onrender.com"
 //#define HOSTNAME "greenhouse-data-acquisition-and-control.onrender.com"
 #define HTTPS_PORT 443

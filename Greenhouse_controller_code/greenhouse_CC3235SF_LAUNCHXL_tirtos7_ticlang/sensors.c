@@ -13,6 +13,17 @@ float HDC2010_tempToFloatCelsius(uint16_t x)
     return ((float)x * (165.0f / 65536.0f) - 40.0f);
 }
 
+float HDC3022_rawToCelsius(uint16_t raw)
+{
+    return -45.0f + (175.0f * ((float)raw / 65535.0f));
+}
+
+uint8_t HDC3022_rawToRH(uint16_t raw)
+{
+    return (uint8_t)(100.0f * ((float)raw / 65535.0f));
+}
+
+
 SensorValues convertIntoPhysicalValues(uint8_t *packet)
 {
     SensorValues values;
@@ -26,11 +37,15 @@ SensorValues convertIntoPhysicalValues(uint8_t *packet)
 
     values.lightLux = 0.01 * pow(2, exponent) * result;
 
-    uint16_t hum = (packet[12] << 8) | packet[11];
-    values.humRH = HDC2010_humToIntRelative(hum);
+    uint16_t rawHum  = (packet[11] << 8) | packet[12];
+    values.humRH = HDC3022_rawToRH(rawHum);
+//    uint16_t hum = (packet[12] << 8) | packet[11];
+//    values.humRH = HDC2010_humToIntRelative(hum);
 
-    uint16_t tmp = (packet[14] << 8) | packet[13];
-    values.tmpCelsius = HDC2010_tempToFloatCelsius(tmp);
+    uint16_t rawTemp = (packet[13] << 8) | packet[14];
+    values.tmpCelsius = HDC3022_rawToCelsius(rawTemp);
+//    uint16_t tmp = (packet[14] << 8) | packet[13];
+//    values.tmpCelsius = HDC2010_tempToFloatCelsius(tmp);
 
     uint64_t valueID = 0;
     for(int i = 8; i >= 1; i--) {

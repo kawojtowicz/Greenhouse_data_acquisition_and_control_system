@@ -11,6 +11,7 @@
 #include "pthread.h"
 #include "semaphore.h"
 #include "spiQueue.h"
+#include "spiTxQueue.h"
 
 #define APPLICATION_NAME                      "GREENHOUSE CONTROLLER"
 #define DEVICE_ERROR                          ("Device error, please refer \"DEVICE ERRORS CODES\" section in errors.h")
@@ -52,11 +53,11 @@ int32_t mode;
 Display_Handle display;
 uint8_t deviceMAC[6] = {0};
 volatile uint32_t g_msTicks = 0;
-uint32_t spiReady = 0;
+uint8_t spiReady = 0;
 char macStr[18];
 char resp[256];
 
-uint8_t rxBuf[15], txBuf[15];
+uint8_t rxBuf[15], txBuf[9];
 
 extern void* spiTask(void* pvParameters);
 extern void* regulatorTask(void* pvParameters);
@@ -121,7 +122,7 @@ void SimpleLinkNetAppEventHandler(SlNetAppEvent_t *pNetAppEvent)
             pthread_attr_init(&pAttrs);
             priParam.sched_priority = 3;
             pthread_attr_setschedparam(&pAttrs, &priParam);
-            pthread_attr_setstacksize(&pAttrs, TASK_STACK_SIZE);
+            pthread_attr_setstacksize(&pAttrs, 4096);
             status = pthread_create(&spiThread, &pAttrs, spiTask, NULL);
             if (status) { printError("Task create failed (spi)", status); }
 
@@ -266,6 +267,7 @@ void mainThread(void *pvParameters)
 
     GPIO_init();
     GPIO_setConfig(CONFIG_GPIO_0, GPIO_CFG_OUTPUT);
+    spiTxQueueInit();
 
 
     /* Print Application name */

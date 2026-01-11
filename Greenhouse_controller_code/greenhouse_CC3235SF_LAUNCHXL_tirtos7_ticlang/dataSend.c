@@ -6,15 +6,18 @@
 #include <ti/sysbios/BIOS.h>
 #include <ti/sysbios/knl/Task.h>
 #include "semaphore.h"
+#include "spiTxQueue.h"
 
-#define TIMER_PERIOD_MS 50
+#define TIMER_PERIOD_MS 5
 
 Timer_Handle timerHandle;
 extern Display_Handle display;
+spi_tx_message_t msgTx;
+
 
 extern uint32_t g_msTicks;
 extern uint32_t spiReady;
-
+extern uint8_t txBuf[9];
 
 void timerISR(UArg arg)
 {
@@ -56,8 +59,15 @@ void* dataSendTask(void* pvParameters)
         if(g_msTicks - lastTick >= 100)
         {
             lastTick = g_msTicks;
-            spiReady = 1;
+//            spiReady = 1;
+            if (mq_receive(spiTxQueue, (char *)&msgTx, sizeof(msgTx), NULL) > 0)
+            {
+                memcpy(txBuf, msgTx.data, 9);
+                spiReady = 1;
+
+            }
         }
+
         Task_sleep(50);
 
     }

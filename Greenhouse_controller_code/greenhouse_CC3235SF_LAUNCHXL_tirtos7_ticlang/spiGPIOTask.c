@@ -15,7 +15,7 @@ extern Display_Handle display;
 extern sem_t ipEventSyncObj;
 
 uint32_t checkSpiReady = 0;
-extern uint32_t spiReady;
+extern uint8_t spiReady;
 
 void* spiGPIOTask(void* pvParameters)
 {

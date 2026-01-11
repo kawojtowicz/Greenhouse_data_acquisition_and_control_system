@@ -32,29 +32,14 @@ extern void httpGetFullZones(const char* deviceId);
 void* httpHTLPostTask(const char* deviceId)
 {
 
-//    char deviceIdLocal[18];
-//        strncpy(deviceIdLocal, macStr, sizeof(deviceIdLocal));
-//        deviceIdLocal[sizeof(deviceIdLocal)-1] = '\0';
+
 
     int status_MAC_post = httpPostAnnounceDevice(macStr, macStr);
     Display_printf(display, 0, 0, " %s\n", macStr);
 
 
     httpGetFullZones(macStr);
-//    Task_sleep(100);
 
-//    ZoneList odp = httpGetDeviceZones(macStr);
-//
-//    for (int i = 0; i < odp.count; i++)
-//    {
-//        zoneIDs[i] = odp.zoneIds[i];
-//    }
-//
-//
-//
-//    if (odp.zoneIds != NULL) free(odp.zoneIds);
-//
-//    Display_printf(display, 0, 0, "%d %d %d\n", zoneIDs[0], zoneIDs[1], zoneIDs[2]);
 
     while(1) {
 
@@ -62,6 +47,8 @@ void* httpHTLPostTask(const char* deviceId)
         mq_receive(spiQueue, (char *)&msg, sizeof(msg), NULL);
 
         SensorValues sensorValues = convertIntoPhysicalValues(msg.data);
+
+
 
 
 
@@ -78,6 +65,8 @@ void* httpHTLPostTask(const char* deviceId)
 
 
         Display_printf(display, 0, 0, "HTTP Response Status Code: %d\n", serverStatusCode);
+        Task_sleep(5000);
+
         httpGetFullZones(macStr);
 
     }
