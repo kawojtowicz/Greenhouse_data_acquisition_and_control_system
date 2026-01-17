@@ -39,6 +39,18 @@ app.use('/sensor-nodes', sensorNodesRoutes);
 app.use('/htl-logs', logsRoutes);
 app.use('/devices', devicesRoutes);
 
+app.use((req, res, next) => {
+  console.log("===== INCOMING REQUEST =====");
+  console.log("Method:", req.method);
+  console.log("URL:", req.originalUrl);
+  console.log("Headers:", req.headers);
+  console.log("IP:", req.ip);
+  console.log("User-Agent:", req.headers['user-agent']);
+  console.log("============================");
+  next();
+});
+
+
 app.get('/ping', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
