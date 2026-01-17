@@ -39,6 +39,11 @@ app.use('/sensor-nodes', sensorNodesRoutes);
 app.use('/htl-logs', logsRoutes);
 app.use('/devices', devicesRoutes);
 
+app.get('/ping', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running! Use /htl-logs for logs.' });
 });
