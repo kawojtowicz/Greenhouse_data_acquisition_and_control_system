@@ -1,0 +1,12 @@
+"./syscfg/ti_drivers_config.o"
+"./syscfg/ti_net_config.o"
+"./syscfg/ti_sysbios_config.o"
+"./syscfg/ti_drivers_net_wifi_config.o"
+"./httpget.o"
+"./main_tirtos.o"
+"./platform.o"
+"./lib/cJSON.o"
+"../cc32xxsf_tirtos7.cmd"
+-lti_utils_build_linker.cmd.genlibs
+-l"ti/devices/cc32xx/driverlib/ticlang/Release/driverlib.a"
+-llibc.a
