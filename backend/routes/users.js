@@ -980,4 +980,67 @@ router.post('/end-devices/update-name', isUserAuthenticated, async (req, res) =>
 });
 
 
+router.delete('/sensors/:id', isUserAuthenticated, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const check = await db.query(`
+      SELECT s.id_sensor_node
+      FROM Sensor_nodes s
+      LEFT JOIN Zones z ON s.id_zone = z.id_zone
+      LEFT JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE s.id_sensor_node = $1 AND g.id_user = $2
+    `, [id, req.session.user.id]);
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Dostęp zabroniony' });
+    }
+
+    await db.query(
+      'DELETE FROM htl_logs WHERE id_sensor_node = $1',
+      [id]
+    );
+
+    await db.query(
+      'DELETE FROM Sensor_nodes WHERE id_sensor_node = $1',
+      [id]
+    );
+
+    res.json({ message: 'Sensor usunięty', id_sensor_node: id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+
+router.delete('/end-devices/:id', isUserAuthenticated, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const check = await db.query(`
+      SELECT ed.id_end_device
+      FROM End_devices ed
+      LEFT JOIN Zones z ON ed.id_zone = z.id_zone
+      LEFT JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
+      WHERE ed.id_end_device = $1 AND g.id_user = $2
+    `, [id, req.session.user.id]);
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Dostęp zabroniony' });
+    }
+
+    await db.query(
+      'DELETE FROM End_devices WHERE id_end_device = $1',
+      [id]
+    );
+
+    res.json({ message: 'End device usunięty', id_end_device: id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Błąd serwera' });
+  }
+});
+
+
 module.exports = router;
