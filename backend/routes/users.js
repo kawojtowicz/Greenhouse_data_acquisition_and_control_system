@@ -1023,7 +1023,11 @@ router.delete('/end-devices/:id', isUserAuthenticated, async (req, res) => {
       FROM End_devices ed
       LEFT JOIN Zones z ON ed.id_zone = z.id_zone
       LEFT JOIN Greenhouses g ON z.id_greenhouse = g.id_greenhouse
-      WHERE ed.id_end_device = $1 AND g.id_user = $2
+      WHERE ed.id_end_device = $1
+        AND (
+          g.id_user = $2
+          OR ed.id_zone IS NULL
+        )
     `, [id, req.session.user.id]);
 
     if (check.rows.length === 0) {
@@ -1041,6 +1045,7 @@ router.delete('/end-devices/:id', isUserAuthenticated, async (req, res) => {
     res.status(500).json({ message: 'Błąd serwera' });
   }
 });
+
 
 
 module.exports = router;
