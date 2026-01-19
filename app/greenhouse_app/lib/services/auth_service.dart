@@ -9,8 +9,8 @@ class AuthService {
 
   AuthService(
     this.dio, {
-    this.baseUrl =
-        'https://greenhouse-data-acquisition-and-control.onrender.com',
+    this.baseUrl = 'https://backend-floral-fog-9850.fly.dev',
+    // 'https://greenhouse-data-acquisition-and-control.onrender.com',
     // 'http://192.168.0.101:3000',
     // 'http://192.168.1.38:3000',
   });
