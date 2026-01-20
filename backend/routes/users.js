@@ -326,11 +326,33 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
           z.width,
           z.height,
           g.greenhouse_name,
+
           (
             zas.temp_alarm_active = TRUE
             OR zas.hum_alarm_active = TRUE
             OR zas.light_alarm_active = TRUE
-          ) AS alarm_active
+          ) AS alarm_active,
+
+          CASE
+            WHEN zas.temp_alarm_active AND (
+                (SELECT temperature FROM htl_logs hl
+                  JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
+                  WHERE sn.id_zone = z.id_zone
+                  ORDER BY hl.log_time DESC LIMIT 1) < z.min_temp
+            ) THEN 'Za niska temperatura'
+
+            WHEN zas.temp_alarm_active AND (
+                (SELECT temperature FROM htl_logs hl
+                  JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
+                  WHERE sn.id_zone = z.id_zone
+                  ORDER BY hl.log_time DESC LIMIT 1) > z.max_temp
+            ) THEN 'Za wysoka temperatura'
+
+            WHEN zas.hum_alarm_active THEN 'Alarm wilgotności'
+            WHEN zas.light_alarm_active THEN 'Alarm światła'
+            ELSE NULL
+          END AS alarm_reason
+
         FROM Zones z
         LEFT JOIN Greenhouse_controllers gc
           ON z.id_greenhouse_controller = gc.id_greenhouse_controller
@@ -339,7 +361,8 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
         LEFT JOIN Zone_alarm_states zas
           ON zas.id_zone = z.id_zone
         WHERE z.id_greenhouse = $1 AND g.id_user = $2
-        ORDER BY z.id_zone 
+        ORDER BY z.id_zone;
+
       `, [greenhouseId, req.session.user.id]);
 
       res.json({ zones: result.rows });
