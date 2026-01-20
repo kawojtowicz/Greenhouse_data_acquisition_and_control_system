@@ -1,5 +1,5 @@
 const db = require('../db');
-const { sendAlarmNotification } = require('services/push'); // FCM
+const { sendAlarmNotification } = require('./push'); // FCM
 
 async function checkOneAlarm({
   zone,
