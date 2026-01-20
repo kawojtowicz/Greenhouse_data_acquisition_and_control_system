@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db'); 
+const { checkZoneAlarms } = require('../services/zone_alarms');
+
 
 router.get('/', async (req, res) => {
   try {
@@ -76,6 +78,12 @@ router.post('/', async (req, res) => {
       );
 
       await client.query('COMMIT');
+
+      checkZoneAlarms(id_sensor_node_num, {
+        temperature,
+        humidity,
+        light
+        }).catch(err => console.error('Alarm check error:', err));
 
       return res.json({
         type: 'sensor',
