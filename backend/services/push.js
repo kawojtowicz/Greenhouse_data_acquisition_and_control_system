@@ -1,5 +1,5 @@
 const admin = require('firebase-admin');
-const { alarmText } = require('./notifications');
+const { alarmText } = require('services/notifications');
 
 async function sendAlarmNotification({ user, zoneName, type, value }) {
   if (!user.fcm_token) return;
