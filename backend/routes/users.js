@@ -510,9 +510,31 @@ router.post('/greenhouses', isUserAuthenticated, async (req, res) => {
 });
 
 
+// router.get('/greenhouses', isUserAuthenticated, async (req, res) => {
+//   try {
+//     const result = await db.query('SELECT * FROM Greenhouses WHERE id_user = $1', [req.session.user.id]);
+//     res.json({ greenhouses: result.rows });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: 'Błąd serwera' });
+//   }
+// });
+
 router.get('/greenhouses', isUserAuthenticated, async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM Greenhouses WHERE id_user = $1', [req.session.user.id]);
+    const result = await db.query(`
+      SELECT g.*, 
+      EXISTS (
+        SELECT 1 FROM Zones z
+        JOIN Zone_alarm_states zas ON z.id_zone = zas.id_zone
+        WHERE z.id_greenhouse = g.id_greenhouse 
+        AND (zas.temp_alarm_active = true OR zas.hum_alarm_active = true OR zas.light_alarm_active = true)
+      ) as has_alarm
+      FROM Greenhouses g
+      WHERE g.id_user = $1
+      ORDER BY g.id_greenhouse
+    `, [req.session.user.id]);
+
     res.json({ greenhouses: result.rows });
   } catch (err) {
     console.error(err);
