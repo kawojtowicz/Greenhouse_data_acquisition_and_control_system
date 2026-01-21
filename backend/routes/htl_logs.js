@@ -77,7 +77,14 @@ router.post('/', async (req, res) => {
         [temperature, humidity, light, id_sensor_node_num]
       );
 
+      await client.query(
+        'UPDATE Sensor_nodes SET is_offline = FALSE WHERE id_sensor_node = $1 AND is_offline = TRUE',
+        [id_sensor_node_num]
+      );
+
       await client.query('COMMIT');
+
+      
 
       checkZoneAlarms(id_sensor_node_num, {
         temperature,

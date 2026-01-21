@@ -1,56 +1,53 @@
 const db = require('../db');
+const cron = require('node-cron');
 const { sendAlarmNotification } = require('./push'); // FCM
+const { alarmText } = require('./notifications');
 
-// async function checkOneAlarm({
-//   zone,
-//   alarm,
-//   value,
-//   min,
-//   max,
-//   delay,
-//   type,
-//   user
-// }) {
-//   if (value === null || value === undefined) return;
 
-//   const now = new Date();
+async function checkSensorsHealth() {
+    console.log('[HealthCheck] Sprawdzanie aktywności sensorów...');
+    try {
 
-//   const broken =
-//     (min !== null && value < min) ||
-//     (max !== null && value > max);
+        const offlineQuery = `
+            SELECT 
+                sn.id_sensor_node, 
+                sn.sensor_node_name, 
+                u.fcm_token, 
+                u.id_user,
+                MAX(hl.log_time) as last_seen
+            FROM Sensor_nodes sn
+            JOIN Greenhouse_controllers gc ON sn.id_greenhouse_controller = gc.id_greenhouse_controller
+            JOIN Users u ON gc.id_user = u.id_user
+            LEFT JOIN htl_logs hl ON sn.id_sensor_node = hl.id_sensor_node
+            WHERE u.sensor_health_check_interval IS NOT NULL
+              AND sn.is_offline = FALSE
+            GROUP BY sn.id_sensor_node, u.id_user, u.fcm_token
+            HAVING 
+                MAX(hl.log_time) < NOW() - (u.sensor_health_check_interval || ' seconds')::interval
+                OR MAX(hl.log_time) IS NULL;
+        `;
 
-//   if (!broken) {
-//     if (alarm.active) {
-//       await db.query(`
-//         UPDATE Zone_alarm_states
-//         SET ${type}_alarm_active = FALSE,
-//             ${type}_alarm_since = NULL
-//         WHERE id_zone = $1
-//       `, [zone.id_zone]);
-//     }
-//     return;
-//   }
+        const { rows: newlyOffline } = await db.query(offlineQuery);
 
-//   if (!alarm.active) {
-//     await db.query(`
-//       UPDATE Zone_alarm_states
-//       SET ${type}_alarm_active = TRUE,
-//           ${type}_alarm_since = $2
-//       WHERE id_zone = $1
-//     `, [zone.id_zone, now]);
-//     return;
-//   }
+        for (const sensor of newlyOffline) {
+            console.log(`[HealthCheck] Sensor ${sensor.sensor_node_name} (ID: ${sensor.id_sensor_node}) przeszedł w tryb OFFLINE.`);
 
-//   const duration = (now - alarm.since) / 1000;
-//   if (duration < delay) return;
+            await sendAlarmNotification({
+                user: { fcm_token: sensor.fcm_token },
+                zoneName: sensor.sensor_node_name,
+                type: 'offline',
+                value: sensor.last_seen ? new Date(sensor.last_seen).toLocaleString() : 'Nigdy'
+            });
 
-//   await sendAlarmNotification({
-//     user,
-//     zoneName: zone.zone_name,
-//     type,
-//     value
-//   });
-// }
+            await db.query('UPDATE Sensor_nodes SET is_offline = TRUE WHERE id_sensor_node = $1', [sensor.id_sensor_node]);
+        }
+
+    } catch (err) {
+        console.error('[HealthCheck] Błąd:', err);
+    }
+}
+
+cron.schedule('* * * * *', checkSensorsHealth);
 
 async function checkOneAlarm({ zone, alarm, value, min, max, delay, type, user }) {
   if (value === null || value === undefined) return;

@@ -13,6 +13,14 @@ app.use((req, res, next) => {
 const cors = require('cors');
 app.use(cors());
 
+const admin = require('firebase-admin');
+require('./services/zone_alarms');
+
+admin.initializeApp({
+  credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_KEY))
+});
+
+
 
 app.use(express.json());
 
