@@ -89,6 +89,31 @@ router.delete('/', isUserAuthenticated, (req, res) => {
     });
 });
 
+
+router.post('/fcm-token', isUserAuthenticated, async (req, res) => {
+  const { fcm_token } = req.body;
+
+  if (!fcm_token || typeof fcm_token !== 'string') {
+    return res.status(400).json({ message: 'fcm_token is required' });
+  }
+
+  try {
+    await db.query(
+      `
+      UPDATE Users
+      SET fcm_token = $1
+      WHERE id_user = $2
+      `,
+      [fcm_token, req.session.user.id]
+    );
+
+    res.json({ message: 'FCM token saved' });
+  } catch (err) {
+    console.error('Error saving FCM token:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.get('/sensors', isUserAuthenticated, async (req, res) => {
   try {
     const userId = req.session.user.id;
