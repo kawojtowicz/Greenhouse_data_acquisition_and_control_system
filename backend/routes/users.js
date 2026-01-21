@@ -1129,6 +1129,24 @@ router.delete('/end-devices/:id', isUserAuthenticated, async (req, res) => {
   }
 });
 
+router.post('/zones/:zoneId/config-alarms', isUserAuthenticated, async (req, res) => {
+  const { zoneId } = req.params;
+  const { min_temp, max_temp, temp_alarm_delay_seconds, min_hum, max_hum } = req.body;
+
+  try {
+    await db.query(`
+      UPDATE Zones 
+      SET min_temp = $1, max_temp = $2, temp_alarm_delay_seconds = $3,
+          min_hum = $4, max_hum = $5
+      WHERE id_zone = $6
+    `, [min_temp, max_temp, temp_alarm_delay_seconds, min_hum, max_hum, zoneId]);
+
+    res.json({ message: 'Alarm config updated' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error updating config' });
+  }
+});
+
 
 
 module.exports = router;
