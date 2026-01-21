@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "494316089776",
+    "project_id": "greenhouse-fcb17",
+    "storage_bucket": "greenhouse-fcb17.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:494316089776:android:3ef183d890ad833f7ea675",
+        "android_client_info": {
+          "package_name": "com.example.greenhouse_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdISYojtq-4fZbTA3MImxxE40aIBByuqk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

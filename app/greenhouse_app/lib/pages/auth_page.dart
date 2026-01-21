@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'home_page.dart';
 import '../services/dio_client.dart';
+import '../services/fcm_service.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -33,6 +34,32 @@ class _AuthPageState extends State<AuthPage> {
     print('Register response: $response');
   }
 
+  // void login() async {
+  //   setState(() => loading = true);
+
+  //   try {
+  //     final user = await _authService.login(
+  //       emailController.text,
+  //       passwordController.text,
+  //     );
+
+  //     setState(() => loading = false);
+
+  //     if (user != null) {
+  //       Navigator.pushReplacement(
+  //         context,
+  //         MaterialPageRoute(builder: (_) => const HomePage()),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     setState(() => loading = false);
+
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+  //     );
+  //   }
+  // }
+
   void login() async {
     setState(() => loading = true);
 
@@ -42,20 +69,24 @@ class _AuthPageState extends State<AuthPage> {
         passwordController.text,
       );
 
-      setState(() => loading = false);
-
       if (user != null) {
+        final token = await FcmService.getToken();
+
+        if (token != null) {
+          await _authService.saveFcmToken(token);
+        }
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomePage()),
         );
       }
     } catch (e) {
-      setState(() => loading = false);
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
       );
+    } finally {
+      setState(() => loading = false);
     }
   }
 

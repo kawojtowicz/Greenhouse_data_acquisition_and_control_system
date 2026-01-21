@@ -9,11 +9,16 @@ class AuthService {
 
   AuthService(
     this.dio, {
-    this.baseUrl = 'https://backend-floral-fog-9850.fly.dev',
-    // 'https://greenhouse-data-acquisition-and-control.onrender.com',
+    this.baseUrl =
+        // 'https://backend-floral-fog-9850.fly.dev',
+        'https://greenhouse-data-acquisition-and-control.onrender.com',
     // 'http://192.168.0.101:3000',
     // 'http://192.168.1.38:3000',
   });
+
+  Future<void> saveFcmToken(String token) async {
+    await dio.post('$baseUrl/users/fcm-token', data: {'fcm_token': token});
+  }
 
   Future<User?> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {

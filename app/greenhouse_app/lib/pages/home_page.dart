@@ -247,13 +247,13 @@ class _HomePageState extends State<HomePage> {
                   title: Text('Nieprzypisane urządzenia'),
                 ),
               ),
-              const PopupMenuItem(
-                value: 'wifi',
-                child: ListTile(
-                  leading: Icon(Icons.wifi),
-                  title: Text('Skonfiguruj Wi-Fi'),
-                ),
-              ),
+              // const PopupMenuItem(
+              //   value: 'wifi',
+              //   child: ListTile(
+              //     leading: Icon(Icons.wifi),
+              //     title: Text('Skonfiguruj Wi-Fi'),
+              //   ),
+              // ),
               const PopupMenuItem(
                 value: 'logout',
                 child: ListTile(

@@ -1,0 +1,225 @@
+[33mcommit 198f8b8c058378c9b44371ce424720126bb24ab6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sun Dec 28 13:26:32 2025 +0100
+
+    added views in app
+
+[33mcommit 9f9ca40eb28f031986b5e7130b981adeab3fca76[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sun Dec 28 13:04:15 2025 +0100
+
+    Added MCUs and app project files
+
+[33mcommit 86e8d59488a2f936015cac1359ca90474a0d94f0[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sat Dec 27 19:28:20 2025 +0100
+
+    htl-logs post changed
+
+[33mcommit 05721527f58682a6e5cdf6edd40e58b1805dfbfa[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sat Dec 27 18:45:12 2025 +0100
+
+    changed htl-logs id sensor node type
+
+[33mcommit 0e30f97f2f301a8053facc031bbfdf63e5e77a26[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sat Dec 27 17:44:48 2025 +0100
+
+    deleted .env
+
+[33mcommit 3f8fed562b3deb56eb53fbe28de7239ad0a36be1[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sat Dec 27 16:58:12 2025 +0100
+
+    changed into postgreSQL remote database
+
+[33mcommit 4f53ef2464be2e21b11037655214e1daacbcbfc7[m
+Merge: ffafcf4 33a600d
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sun Dec 21 23:18:19 2025 +0100
+
+    Merge branch 'main' of https://github.com/kawojtowicz/Greenhouse_data_acquisition_and_control_system
+
+[33mcommit ffafcf47cfbb278b1fdb4b8a5ec366722cd4c1e8[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sun Dec 21 23:17:55 2025 +0100
+
+    moved to main dir
+
+[33mcommit 33a600d5cdc94baf219af305736e36fa4c9a18fb[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Sun Dec 21 23:13:35 2025 +0100
+
+    Add or update the Azure App Service build and deployment workflow config
+
+[33mcommit c9573caae33e5c1818ec51e912a1c22a3586c0ef[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Sun Dec 21 23:12:53 2025 +0100
+
+    Update main_greenhouse.yml
+
+[33mcommit 301930b1cc42fa86884508754f113c7da90eb3a5[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Sun Dec 21 23:11:05 2025 +0100
+
+    Add or update the Azure App Service build and deployment workflow config
+
+[33mcommit 5076265add67e0f86daf35e9a2826f20797a9331[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Sun Dec 21 23:10:31 2025 +0100
+
+    Update main_greenhouse.yml
+
+[33mcommit 4c7cc65101ab89d4c358a51eb742e4810ec69cdb[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Sun Dec 21 23:03:09 2025 +0100
+
+    Add or update the Azure App Service build and deployment workflow config
+
+[33mcommit 8d46cae810bb4d3d9b4413bec294c5ca75066084[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Sun Dec 21 23:02:06 2025 +0100
+
+    Update main_greenhouse.yml
+
+[33mcommit a2c2a24c30a3f4c4fc632a7973c395eaab8532c0[m
+Merge: 260e091 52d2abf
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sun Dec 21 22:59:43 2025 +0100
+
+    Merge branch 'main' of https://github.com/kawojtowicz/Greenhouse_data_acquisition_and_control_system
+
+[33mcommit 260e091d485d71b4bc178fb966a18a2fad1601b1[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sun Dec 21 22:56:58 2025 +0100
+
+    moved package.json
+
+[33mcommit 52d2abf48f78dbdcbe8b2c17c76ebf43c5bb1930[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Sun Dec 21 22:39:55 2025 +0100
+
+    Add or update the Azure App Service build and deployment workflow config
+
+[33mcommit 92d47533f9f887c46ee31ba336e2aa56e2b5ed3e[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Sun Dec 21 22:32:48 2025 +0100
+
+    Add or update the Azure App Service build and deployment workflow config
+
+[33mcommit 79768bb6bdad353e6d6ee55d2e312e28f5d9c735[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sun Dec 21 21:41:35 2025 +0100
+
+    Added devices.js
+
+[33mcommit b9105088a8c6dbf32d94c10fcc34e1bb3541788b[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sat Dec 13 16:46:55 2025 +0100
+
+    updated routes
+
+[33mcommit 62f408ff93b5c8fef9c4308625dfced12be54214[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sat Dec 13 16:45:26 2025 +0100
+
+    server working with zone
+
+[33mcommit e0959f2a46e827805873d8656eb4051dadf7a7b9[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Wed Dec 10 20:28:07 2025 +0100
+
+    Added simple backend code
+
+[33mcommit bd40cbee652c3c9efb05004e0e13dce5a5923efb[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Sun Nov 16 20:10:02 2025 +0100
+
+    Http post to local server working
+
+[33mcommit 6a5b4e8da1bc428bcf4ee6cbbb08ff82057b2146[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Thu Oct 2 16:24:59 2025 +0200
+
+    Initial version, connections done
+
+[33mcommit d0f0fc80af2cf0ef7b0921c3d3e2f0f6e2c8ce45[m
+Author: Katarzyna Wojtowicz <01178260@pw.edu.pl>
+Date:   Thu Oct 2 15:54:41 2025 +0200
+
+    first schematic version
+
+[33mcommit f3a2ff769b427075602316365f7a678170917cc3[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Thu Jul 24 13:02:16 2025 +0200
+
+    Delete Resources directory
+
+[33mcommit 923620e3681da61c336c7c762c74d3327ec82fef[m
+Author: Katarzyna <kawojtowicz9@gmail.com>
+Date:   Fri Jul 18 15:05:18 2025 +0200
+
+    test
+
+[33mcommit a520e889d1a839ee41d3e7176d609fb9b95d55e3[m
+Merge: dd8ffe8 1e201f8
+Author: Katarzyna <kawojtowicz9@gmail.com>
+Date:   Fri Jul 18 15:03:49 2025 +0200
+
+    Merge branch 'main' of https://github.com/kawojtowicz/Greenhouse_data_acquisition_and_control_system
+
+[33mcommit dd8ffe857f97ece71a5a200b7162c3ffe1398b13[m
+Author: Katarzyna <kawojtowicz9@gmail.com>
+Date:   Fri Jul 18 15:00:18 2025 +0200
+
+    Added some articles and started to connect TPS22919
+
+[33mcommit 77b44de62a0e53132f53211c01453d693fb57bad[m
+Author: Katarzyna <kawojtowicz9@gmail.com>
+Date:   Fri Jul 18 14:58:27 2025 +0200
+
+    Started to connect low switch
+
+[33mcommit 1e201f8dbd86d95dd50e6a0939a1ce5825751541[m
+Merge: 2c4be0d 3fee0b1
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Tue Jul 15 19:21:50 2025 +0200
+
+    Merge pull request #1 from kawojtowicz/master
+    
+    Master
+
+[33mcommit 3fee0b13689f15451bb7dec71f74ed0bfa7ad3fb[m
+Author: Katarzyna <kawojtowicz9@gmail.com>
+Date:   Tue Jul 15 19:20:22 2025 +0200
+
+    Added helpful resources.
+
+[33mcommit 995a526bf1ff075c7a0aba4023307b6aadb26746[m
+Author: Katarzyna <kawojtowicz9@gmail.com>
+Date:   Tue Jul 15 19:15:26 2025 +0200
+
+[33mcommit 67799d2f9da2cdf73880eb18fc4489ba778e641a[m
+Author: Katarzyna <kawojtowicz9@gmail.com>
+Date:   Tue Jul 15 19:11:34 2025 +0200
+
+    Changed paper size.
+
+[33mcommit d4105578a6654d90bd971f6583ab1943ab90226d[m
+Author: Wojtowicz <k-wojtowicz@ti.com>
+Date:   Tue Jul 15 18:44:19 2025 +0200
+
+    Added initial files.
+
+[33mcommit 2c4be0d635dccf5349e1a18e3eac1cb0e05567b4[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Tue Jul 15 18:26:24 2025 +0200
+
+    Update .gitignore
+
+[33mcommit 91f1ff900d44238019c0d9a302d13580b5cdfc59[m
+Author: kawojtowicz <kawojtowicz9@gmail.com>
+Date:   Tue Jul 15 18:25:30 2025 +0200
+
+    Initial commit

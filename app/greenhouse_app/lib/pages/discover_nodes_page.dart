@@ -22,6 +22,56 @@ class _UnassignedDevicesPageState extends State<UnassignedDevicesPage> {
     devicesFuture = _loadDevices();
   }
 
+  Future<void> _deleteDevice(_DeviceItem device) async {
+    try {
+      if (device.isSensor) {
+        await api.deleteSensor(device.id);
+      } else {
+        await api.deleteEndDevice(device.id);
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Urządzenie usunięte')));
+
+      setState(() {
+        devicesFuture = _loadDevices();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Błąd usuwania: $e')));
+    }
+  }
+
+  Future<void> _confirmDelete(_DeviceItem device) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Potwierdzenie'),
+        content: Text(
+          device.isSensor
+              ? 'Czy na pewno chcesz usunąć ten sensor?'
+              : 'Czy na pewno chcesz usunąć to urządzenie?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Anuluj'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Usuń', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      _deleteDevice(device);
+    }
+  }
+
   Future<List<_DeviceItem>> _loadDevices() async {
     final sensors = await api.fetchUnassignedSensors();
     final endDevices = await api.fetchUnassignedEndDevices();
@@ -110,6 +160,7 @@ class _UnassignedDevicesPageState extends State<UnassignedDevicesPage> {
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ListTile(
                       leading: Icon(
@@ -120,13 +171,36 @@ class _UnassignedDevicesPageState extends State<UnassignedDevicesPage> {
                       subtitle: Text(
                         '${device.isSensor ? 'Sensor' : 'End Device'} • ID: ${device.id}',
                       ),
-                      trailing: TextButton(
-                        onPressed: () => _fetchZones(device.id),
-                        child: Text(
-                          isExpanded ? 'Ukryj strefy' : 'Przypisz do strefy',
-                        ),
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => _fetchZones(device.id),
+                            child: Text(
+                              isExpanded
+                                  ? 'Ukryj strefy'
+                                  : 'Przypisz do strefy',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () => _confirmDelete(device),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                            child: const Text('Usuń'),
+                          ),
+                        ],
                       ),
                     ),
+
                     if (isExpanded)
                       ...zones.map(
                         (zone) => ListTile(

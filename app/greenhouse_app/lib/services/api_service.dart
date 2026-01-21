@@ -13,8 +13,9 @@ import '../models/end_device.dart';
 
 class ApiService {
   final Dio dio = DioClient().dio;
-  final String baseUrl = 'https://backend-floral-fog-9850.fly.dev';
-  // 'https://greenhouse-data-acquisition-and-control.onrender.com';
+  final String baseUrl =
+      // 'https://backend-floral-fog-9850.fly.dev';
+      'https://greenhouse-data-acquisition-and-control.onrender.com';
   // 'http://192.168.0.101:3000';
   // 'http://192.168.1.38:3000';
 
@@ -491,5 +492,23 @@ class ApiService {
       '$baseUrl/users/end-devices/update-name',
       data: {'id_end_device': id, 'new_name': newName},
     );
+  }
+
+  Future<void> deleteSensor(int sensorId) async {
+    try {
+      await dio.delete('$baseUrl/users/sensors/$sensorId');
+    } catch (e) {
+      print('deleteSensor error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteEndDevice(int endDeviceId) async {
+    try {
+      await dio.delete('$baseUrl/users/end-devices/$endDeviceId');
+    } catch (e) {
+      print('deleteEndDevice error: $e');
+      rethrow;
+    }
   }
 }

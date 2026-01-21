@@ -22,6 +22,8 @@ class ZoneRect {
   double height;
   String name;
   String? assignedController;
+  bool alarmActive;
+  String? alarmReason;
 
   ZoneRect({
     this.id,
@@ -31,6 +33,8 @@ class ZoneRect {
     required this.height,
     required this.name,
     this.assignedController,
+    this.alarmActive = false,
+    this.alarmReason,
   });
 }
 
@@ -279,9 +283,6 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                 final controller = controllersData[index];
                 return ListTile(
                   title: Text(controller.deviceId ?? 'Brak device_id'),
-                  subtitle: controller.deviceToken != null
-                      ? Text('Token: ${controller.deviceToken}')
-                      : null,
                   onTap: () async {
                     await ApiService().assignZoneToController(
                       zoneId: zoneId,
@@ -475,6 +476,8 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   }
 
   Future<void> _fetchZones() async {
+    bool hadAlarmBefore = zones.any((z) => z.alarmActive);
+
     final fetched = await ApiService().fetchZonesWithSensors(
       widget.greenhouse.id,
     );
@@ -490,10 +493,29 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
               height: z.height.toDouble(),
               name: z.name,
               assignedController: z.controllerDeviceId ?? '⚠ Brak!',
+              alarmActive: z.alarmActive,
+              alarmReason: z.alarmReason,
             ),
           )
           .toList();
     });
+
+    bool hasAlarmNow = zones.any((z) => z.alarmActive);
+
+    if (!hadAlarmBefore && hasAlarmNow) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('⚠️ Alarm w jednej ze stref!'),
+        ),
+      );
+    }
+
+    for (final z in zones) {
+      debugPrint(
+        'ZONE ${z.name} alarm=${z.alarmActive} reason="${z.alarmReason}"',
+      );
+    }
   }
 
   void toggleEditMode() async {
@@ -1214,97 +1236,120 @@ class ZonesPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    final fillPaint = Paint()..style = PaintingStyle.fill;
+    final strokePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
-    paint.color = Colors.orange;
     for (final z in zones) {
       final x = z.width < 0 ? z.x + z.width : z.x;
       final y = z.height < 0 ? z.y + z.height : z.y;
       final width = z.width.abs();
       final height = z.height.abs();
 
-      canvas.drawRect(Rect.fromLTWH(x, y, width, height), paint);
-      _drawZoneName(canvas, z.name, x, y, width, height, z.assignedController);
+      if (z.alarmActive) {
+        fillPaint.color = Colors.red.withOpacity(0.25);
+        canvas.drawRect(Rect.fromLTWH(x, y, width, height), fillPaint);
+      }
+
+      strokePaint.color = z.alarmActive ? Colors.red : Colors.orange;
+      canvas.drawRect(Rect.fromLTWH(x, y, width, height), strokePaint);
+
+      _drawZoneTexts(canvas, z, x, y, width, height);
     }
 
     if (current != null) {
-      paint.color = Colors.red;
+      strokePaint.color = Colors.red;
       final x = current!.width < 0 ? current!.x + current!.width : current!.x;
       final y = current!.height < 0 ? current!.y + current!.height : current!.y;
       final width = current!.width.abs();
       final height = current!.height.abs();
 
-      canvas.drawRect(Rect.fromLTWH(x, y, width, height), paint);
-      _drawZoneName(canvas, current!.name, x, y, width, height);
+      canvas.drawRect(Rect.fromLTWH(x, y, width, height), strokePaint);
+      _drawZoneTexts(canvas, current!, x, y, width, height);
     }
   }
 
-  void _drawZoneName(
+  void _drawZoneTexts(
     Canvas canvas,
-    String name,
+    ZoneRect z,
     double x,
     double y,
     double width,
-    double height, [
-    String? controllerName,
-  ]) {
-    if (name.isNotEmpty) {
-      final textSpan = TextSpan(
-        text: name,
-        style: const TextStyle(
-          color: Colors.black87,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+    double height,
+  ) {
+    if (z.name.isNotEmpty) {
+      final namePainter = TextPainter(
+        text: TextSpan(
+          text: z.name,
+          style: const TextStyle(
+            color: Color.fromARGB(166, 22, 137, 7),
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      );
-
-      final textPainter = TextPainter(
-        text: textSpan,
-        textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
         maxLines: 1,
         ellipsis: '...',
       );
 
-      textPainter.layout(minWidth: 0, maxWidth: width);
-      final offset = Offset(
-        x + (width - textPainter.width) / 2,
-        y + (height - textPainter.height) / 2 - 8,
+      namePainter.layout(maxWidth: width);
+      namePainter.paint(
+        canvas,
+        Offset(x + (width - namePainter.width) / 2, y + 6),
       );
-
-      textPainter.paint(canvas, offset);
     }
 
-    if (controllerName != null || controllerName == null && name.isNotEmpty) {
-      final controllerText = 'Kontroler: ${controllerName}' ?? '⚠ Brak!';
-      final controllerSpan = TextSpan(
-        text: controllerText,
+    if (z.alarmActive && z.alarmReason != null) {
+      final alarmPainter = TextPainter(
+        text: TextSpan(
+          text: '⚠ ${z.alarmReason}',
+          style: const TextStyle(
+            color: Colors.red,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+      );
+
+      alarmPainter.layout(maxWidth: width - 8);
+      alarmPainter.paint(
+        canvas,
+        Offset(
+          x + (width - alarmPainter.width) / 2,
+          y + height / 2 - alarmPainter.height / 2,
+        ),
+      );
+    }
+
+    final controllerText = z.assignedController ?? '⚠ Brak!';
+    final controllerPainter = TextPainter(
+      text: TextSpan(
+        text: 'Kontroler: $controllerText',
         style: TextStyle(
-          color: controllerName == null ? Colors.red : Colors.blue,
+          color: z.assignedController == null ? Colors.red : Colors.blue,
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
-      );
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      ellipsis: '...',
+    );
 
-      final controllerPainter = TextPainter(
-        text: controllerSpan,
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-        maxLines: 1,
-        ellipsis: '...',
-      );
-
-      controllerPainter.layout(minWidth: 0, maxWidth: width);
-
-      final controllerOffset = Offset(
+    controllerPainter.layout(maxWidth: width);
+    controllerPainter.paint(
+      canvas,
+      Offset(
         x + (width - controllerPainter.width) / 2,
         y + height - controllerPainter.height - 2,
-      );
-
-      controllerPainter.paint(canvas, controllerOffset);
-    }
+      ),
+    );
   }
 
   @override
