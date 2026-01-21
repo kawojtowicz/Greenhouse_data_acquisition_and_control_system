@@ -1,26 +1,67 @@
 const db = require('../db');
 const { sendAlarmNotification } = require('./push'); // FCM
 
-async function checkOneAlarm({
-  zone,
-  alarm,
-  value,
-  min,
-  max,
-  delay,
-  type,
-  user
-}) {
+// async function checkOneAlarm({
+//   zone,
+//   alarm,
+//   value,
+//   min,
+//   max,
+//   delay,
+//   type,
+//   user
+// }) {
+//   if (value === null || value === undefined) return;
+
+//   const now = new Date();
+
+//   const broken =
+//     (min !== null && value < min) ||
+//     (max !== null && value > max);
+
+//   if (!broken) {
+//     if (alarm.active) {
+//       await db.query(`
+//         UPDATE Zone_alarm_states
+//         SET ${type}_alarm_active = FALSE,
+//             ${type}_alarm_since = NULL
+//         WHERE id_zone = $1
+//       `, [zone.id_zone]);
+//     }
+//     return;
+//   }
+
+//   if (!alarm.active) {
+//     await db.query(`
+//       UPDATE Zone_alarm_states
+//       SET ${type}_alarm_active = TRUE,
+//           ${type}_alarm_since = $2
+//       WHERE id_zone = $1
+//     `, [zone.id_zone, now]);
+//     return;
+//   }
+
+//   const duration = (now - alarm.since) / 1000;
+//   if (duration < delay) return;
+
+//   await sendAlarmNotification({
+//     user,
+//     zoneName: zone.zone_name,
+//     type,
+//     value
+//   });
+// }
+
+async function checkOneAlarm({ zone, alarm, value, min, max, delay, type, user }) {
   if (value === null || value === undefined) return;
 
   const now = new Date();
+  const sinceDate = alarm.since ? new Date(alarm.since) : null;
 
-  const broken =
-    (min !== null && value < min) ||
-    (max !== null && value > max);
+  const broken = (min !== null && value < min) || (max !== null && value > max);
 
   if (!broken) {
-    if (alarm.active) {
+    if (alarm.active || sinceDate) {
       await db.query(`
         UPDATE Zone_alarm_states
         SET ${type}_alarm_active = FALSE,
@@ -31,26 +72,35 @@ async function checkOneAlarm({
     return;
   }
 
-  if (!alarm.active) {
+  if (!sinceDate) {
     await db.query(`
       UPDATE Zone_alarm_states
-      SET ${type}_alarm_active = TRUE,
-          ${type}_alarm_since = $2
+      SET ${type}_alarm_since = $2
       WHERE id_zone = $1
     `, [zone.id_zone, now]);
     return;
   }
 
-  const duration = (now - alarm.since) / 1000;
+  const duration = (now - sinceDate) / 1000;
   if (duration < delay) return;
 
-  await sendAlarmNotification({
-    user,
-    zoneName: zone.zone_name,
-    type,
-    value
-  });
+  if (!alarm.active) {
+
+    await db.query(`
+      UPDATE Zone_alarm_states
+      SET ${type}_alarm_active = TRUE
+      WHERE id_zone = $1
+    `, [zone.id_zone]);
+
+    await sendAlarmNotification({
+      user,
+      zoneName: zone.zone_name,
+      type,
+      value
+    });
+  }
 }
+
 
 async function checkZoneAlarms(sensorNodeId, log) {
   const { rows } = await db.query(`
