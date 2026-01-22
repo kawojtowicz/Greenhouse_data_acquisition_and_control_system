@@ -301,102 +301,180 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
 });
 
 
-// router.get('/zones', isUserAuthenticated, async (req, res) => {
-//   const greenhouseId = req.query.greenhouse_id;
-//   if (!greenhouseId) return res.status(400).json({ message: 'greenhouse_id required' });
 
-//   try {
-//     const result = await db.query(`
-//       SELECT 
-//         z.id_zone,
-//         z.zone_name,
-//         z.id_greenhouse_controller,
-//         gc.device_id AS controller_device_id,
-//         z.id_greenhouse,
-//         z.x,
-//         z.y,
-//         z.width,
-//         z.height,
-//         g.greenhouse_name
-//       FROM Zones z
-//       LEFT JOIN Greenhouse_controllers gc
-//         ON z.id_greenhouse_controller = gc.id_greenhouse_controller
-//       JOIN Greenhouses g 
-//         ON z.id_greenhouse = g.id_greenhouse
-//       WHERE z.id_greenhouse = $1 AND g.id_user = $2
-//       ORDER BY z.id_zone 
-//     `, [greenhouseId, req.session.user.id]);
+  // router.get('/zones', isUserAuthenticated, async (req, res) => {
+  //   const greenhouseId = req.query.greenhouse_id;
+  //   if (!greenhouseId) return res.status(400).json({ message: 'greenhouse_id required' });
 
-//     res.json({ zones: result.rows });
-//   } catch (err) {
-//     console.error('Error fetching zones:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// });
+  //   try {
+  //     const result = await db.query(`
+  //       SELECT 
+  //         z.id_zone,
+  //         z.zone_name,
+  //         z.id_greenhouse_controller,
+  //         gc.device_id AS controller_device_id,
+  //         z.id_greenhouse,
+  //         z.x,
+  //         z.y,
+  //         z.width,
+  //         z.height,
+  //         g.greenhouse_name,
 
-  router.get('/zones', isUserAuthenticated, async (req, res) => {
-    const greenhouseId = req.query.greenhouse_id;
-    if (!greenhouseId) return res.status(400).json({ message: 'greenhouse_id required' });
+  //         (
+  //           zas.temp_alarm_active = TRUE
+  //           OR zas.hum_alarm_active = TRUE
+  //           OR zas.light_alarm_active = TRUE
+  //         ) AS alarm_active,
 
-    try {
-      const result = await db.query(`
-        SELECT 
-          z.id_zone,
-          z.zone_name,
-          z.id_greenhouse_controller,
-          gc.device_id AS controller_device_id,
-          z.id_greenhouse,
-          z.x,
-          z.y,
-          z.width,
-          z.height,
-          g.greenhouse_name,
+  //         CASE
+  //           WHEN zas.temp_alarm_active AND (
+  //               (SELECT temperature FROM htl_logs hl
+  //                 JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
+  //                 WHERE sn.id_zone = z.id_zone
+  //                 ORDER BY hl.log_time DESC LIMIT 1) < z.min_temp
+  //           ) THEN 'Za niska temperatura'
 
-          (
-            zas.temp_alarm_active = TRUE
-            OR zas.hum_alarm_active = TRUE
-            OR zas.light_alarm_active = TRUE
-          ) AS alarm_active,
+  //           WHEN zas.temp_alarm_active AND (
+  //               (SELECT temperature FROM htl_logs hl
+  //                 JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
+  //                 WHERE sn.id_zone = z.id_zone
+  //                 ORDER BY hl.log_time DESC LIMIT 1) > z.max_temp
+  //           ) THEN 'Za wysoka temperatura'
 
-          CASE
-            WHEN zas.temp_alarm_active AND (
-                (SELECT temperature FROM htl_logs hl
-                  JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
-                  WHERE sn.id_zone = z.id_zone
-                  ORDER BY hl.log_time DESC LIMIT 1) < z.min_temp
-            ) THEN 'Za niska temperatura'
+  //           WHEN zas.hum_alarm_active THEN 'Alarm wilgotności'
+  //           WHEN zas.light_alarm_active THEN 'Alarm światła'
+  //           ELSE NULL
+  //         END AS alarm_reason
 
-            WHEN zas.temp_alarm_active AND (
-                (SELECT temperature FROM htl_logs hl
-                  JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
-                  WHERE sn.id_zone = z.id_zone
-                  ORDER BY hl.log_time DESC LIMIT 1) > z.max_temp
-            ) THEN 'Za wysoka temperatura'
+  //       FROM Zones z
+  //       LEFT JOIN Greenhouse_controllers gc
+  //         ON z.id_greenhouse_controller = gc.id_greenhouse_controller
+  //       JOIN Greenhouses g 
+  //         ON z.id_greenhouse = g.id_greenhouse
+  //       LEFT JOIN Zone_alarm_states zas
+  //         ON zas.id_zone = z.id_zone
+  //       WHERE z.id_greenhouse = $1 AND g.id_user = $2
+  //       ORDER BY z.id_zone;
 
-            WHEN zas.hum_alarm_active THEN 'Alarm wilgotności'
-            WHEN zas.light_alarm_active THEN 'Alarm światła'
-            ELSE NULL
-          END AS alarm_reason
+  //     `, [greenhouseId, req.session.user.id]);
 
-        FROM Zones z
-        LEFT JOIN Greenhouse_controllers gc
-          ON z.id_greenhouse_controller = gc.id_greenhouse_controller
-        JOIN Greenhouses g 
-          ON z.id_greenhouse = g.id_greenhouse
-        LEFT JOIN Zone_alarm_states zas
-          ON zas.id_zone = z.id_zone
-        WHERE z.id_greenhouse = $1 AND g.id_user = $2
-        ORDER BY z.id_zone;
+  //     res.json({ zones: result.rows });
+  //   } catch (err) {
+  //     console.error('Error fetching zones:', err);
+  //     res.status(500).json({ message: 'Server error' });
+  //   }
+  // });
 
-      `, [greenhouseId, req.session.user.id]);
+router.get('/zones', isUserAuthenticated, async (req, res) => {
+  const greenhouseId = req.query.greenhouse_id;
+  if (!greenhouseId) {
+    return res.status(400).json({ message: 'greenhouse_id required' });
+  }
 
-      res.json({ zones: result.rows });
-    } catch (err) {
-      console.error('Error fetching zones:', err);
-      res.status(500).json({ message: 'Server error' });
-    }
-  });
+  try {
+    const result = await db.query(
+      `
+      SELECT 
+        z.id_zone,
+        z.zone_name,
+        z.id_greenhouse_controller,
+        gc.device_id AS controller_device_id,
+        z.id_greenhouse,
+        z.x,
+        z.y,
+        z.width,
+        z.height,
+        g.greenhouse_name,
 
+        z.min_temp,
+        z.max_temp,
+        z.min_hum,
+        z.max_hum,
+        z.min_light,
+        z.max_light,
+
+        z.temp_alarm_delay_seconds,
+        z.hum_alarm_delay_seconds,
+        z.light_alarm_delay_seconds,
+
+        (
+          COALESCE(zas.temp_alarm_active, FALSE) = TRUE
+          OR COALESCE(zas.hum_alarm_active, FALSE) = TRUE
+          OR COALESCE(zas.light_alarm_active, FALSE) = TRUE
+        ) AS alarm_active,
+
+        CASE
+          -- temperatura
+          WHEN COALESCE(zas.temp_alarm_active, FALSE) = TRUE
+           AND z.min_temp IS NOT NULL
+           AND (
+              SELECT hl.temperature
+              FROM htl_logs hl
+              JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
+              WHERE sn.id_zone = z.id_zone
+              ORDER BY hl.log_time DESC
+              LIMIT 1
+           ) IS NOT NULL
+           AND (
+              SELECT hl.temperature
+              FROM htl_logs hl
+              JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
+              WHERE sn.id_zone = z.id_zone
+              ORDER BY hl.log_time DESC
+              LIMIT 1
+           ) < z.min_temp
+          THEN 'Za niska temperatura'
+
+          WHEN COALESCE(zas.temp_alarm_active, FALSE) = TRUE
+           AND z.max_temp IS NOT NULL
+           AND (
+              SELECT hl.temperature
+              FROM htl_logs hl
+              JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
+              WHERE sn.id_zone = z.id_zone
+              ORDER BY hl.log_time DESC
+              LIMIT 1
+           ) IS NOT NULL
+           AND (
+              SELECT hl.temperature
+              FROM htl_logs hl
+              JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
+              WHERE sn.id_zone = z.id_zone
+              ORDER BY hl.log_time DESC
+              LIMIT 1
+           ) > z.max_temp
+          THEN 'Za wysoka temperatura'
+
+          -- wilgotność (jak chcesz dokładne min/max analogicznie, daj znać)
+          WHEN COALESCE(zas.hum_alarm_active, FALSE) = TRUE
+          THEN 'Alarm wilgotności'
+
+          -- światło (jak chcesz dokładne min/max analogicznie, daj znać)
+          WHEN COALESCE(zas.light_alarm_active, FALSE) = TRUE
+          THEN 'Alarm światła'
+
+          ELSE NULL
+        END AS alarm_reason
+
+      FROM Zones z
+      LEFT JOIN Greenhouse_controllers gc
+        ON z.id_greenhouse_controller = gc.id_greenhouse_controller
+      JOIN Greenhouses g 
+        ON z.id_greenhouse = g.id_greenhouse
+      LEFT JOIN Zone_alarm_states zas
+        ON zas.id_zone = z.id_zone
+      WHERE z.id_greenhouse = $1 AND g.id_user = $2
+      ORDER BY z.id_zone;
+      `,
+      [greenhouseId, req.session.user.id],
+    );
+
+    res.json({ zones: result.rows });
+  } catch (err) {
+    console.error('Error fetching zones:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 
 
