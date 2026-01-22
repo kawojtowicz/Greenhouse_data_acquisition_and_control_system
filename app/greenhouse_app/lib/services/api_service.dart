@@ -13,9 +13,8 @@ import '../models/end_device.dart';
 
 class ApiService {
   final Dio dio = DioClient().dio;
-  final String baseUrl =
-      // 'https://backend-floral-fog-9850.fly.dev';
-      'https://greenhouse-data-acquisition-and-control.onrender.com';
+  final String baseUrl = 'https://backend-floral-fog-9850.fly.dev';
+  // 'https://greenhouse-data-acquisition-and-control.onrender.com';
   // 'http://192.168.0.101:3000';
   // 'http://192.168.1.38:3000';
 
@@ -508,6 +507,78 @@ class ApiService {
       await dio.delete('$baseUrl/users/end-devices/$endDeviceId');
     } catch (e) {
       print('deleteEndDevice error: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Greenhouse>> fetchGreenhousesWithZones() async {
+    try {
+      List<Greenhouse> greenhouses = await fetchUserGreenhouses();
+
+      for (var gh in greenhouses) {
+        final response = await dio.get(
+          '$baseUrl/users/greenhouses/${gh.id}/zones',
+        );
+
+        if (response.statusCode == 200) {
+          gh.zones = (response.data['zones'] as List)
+              .map((z) => Zone.fromJson(z))
+              .toList();
+        }
+      }
+
+      return greenhouses;
+    } catch (e) {
+      print("Błąd fetchGreenhousesWithZones: $e");
+      return [];
+    }
+  }
+
+  Future<bool> updateZoneAlarms(int zoneId, Map<String, dynamic> data) async {
+    try {
+      final response = await dio.post(
+        '$baseUrl/users/zones/$zoneId/config-alarms',
+        data: data,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Błąd updateZoneAlarms: $e");
+      return false;
+    }
+  }
+
+  Future<int> fetchSensorHealthCheckInterval() async {
+    try {
+      final response = await dio.get(
+        '$baseUrl/users/sensor-health-check',
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final v = data['sensor_health_check_interval'];
+        if (v is int) return v;
+        if (v is String) return int.tryParse(v) ?? 30;
+        return 30;
+      }
+    } catch (e) {
+      print('fetchSensorHealthCheckInterval error: $e');
+    }
+    throw Exception('Nie udało się pobrać sensor_health_check_interval');
+  }
+
+  Future<void> updateSensorHealthCheckInterval(int seconds) async {
+    try {
+      final response = await dio.post(
+        '$baseUrl/users/sensor-health-check',
+        data: {'sensor_health_check_interval': seconds},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) return;
+      throw Exception('Status: ${response.statusCode}');
+    } catch (e) {
+      print('updateSensorHealthCheckInterval error: $e');
       rethrow;
     }
   }

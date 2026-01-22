@@ -25,6 +25,17 @@ class ZoneRect {
   bool alarmActive;
   String? alarmReason;
 
+  double? minTemp;
+  double? maxTemp;
+  double? minHum;
+  double? maxHum;
+  double? minLight;
+  double? maxLight;
+
+  int? tempDelay;
+  int? humDelay;
+  int? lightDelay;
+
   ZoneRect({
     this.id,
     required this.x,
@@ -35,6 +46,16 @@ class ZoneRect {
     this.assignedController,
     this.alarmActive = false,
     this.alarmReason,
+
+    this.minTemp,
+    this.maxTemp,
+    this.minHum,
+    this.maxHum,
+    this.minLight,
+    this.maxLight,
+    this.tempDelay,
+    this.humDelay,
+    this.lightDelay,
   });
 }
 
@@ -168,7 +189,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('Edytuj ${device.name}'),
+        title: Text('Edytuj: ${device.name}'),
         content: SingleChildScrollView(
           child: Column(
             children: [
@@ -186,12 +207,12 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
               ),
               const SizedBox(height: 12),
 
-              _numField('Temp ↑', upTempCtrl),
-              _numField('Temp ↓', downTempCtrl),
-              _numField('Wilg ↑', upHumCtrl),
-              _numField('Wilg ↓', downHumCtrl),
-              _numField('Światło ↑', upLightCtrl),
-              _numField('Światło ↓', downLightCtrl),
+              _numField('Temperatura wyłączenia (°C)', upTempCtrl),
+              _numField('Temperatura włączenia (°C)', downTempCtrl),
+              _numField('Wilgotność wyłączenia (%)', upHumCtrl),
+              _numField('Wilgotność włączenia (%)', downHumCtrl),
+              _numField('Światło wyłączenia (lx)', upLightCtrl),
+              _numField('Światło włączenia (lx)', downLightCtrl),
             ],
           ),
         ),
@@ -476,7 +497,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
   }
 
   Future<void> _fetchZones() async {
-    bool hadAlarmBefore = zones.any((z) => z.alarmActive);
+    final hadAlarmBefore = zones.any((z) => z.alarmActive);
 
     final fetched = await ApiService().fetchZonesWithSensors(
       widget.greenhouse.id,
@@ -495,12 +516,23 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
               assignedController: z.controllerDeviceId ?? '⚠ Brak!',
               alarmActive: z.alarmActive,
               alarmReason: z.alarmReason,
+
+              minTemp: z.minTemp,
+              maxTemp: z.maxTemp,
+              minHum: z.minHum,
+              maxHum: z.maxHum,
+              minLight: z.minLight,
+              maxLight: z.maxLight,
+
+              tempDelay: z.tempAlarmDelaySeconds,
+              humDelay: z.humAlarmDelaySeconds,
+              lightDelay: z.lightAlarmDelaySeconds,
             ),
           )
           .toList();
     });
 
-    bool hasAlarmNow = zones.any((z) => z.alarmActive);
+    final hasAlarmNow = zones.any((z) => z.alarmActive);
 
     if (!hadAlarmBefore && hasAlarmNow) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -584,6 +616,197 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
     setState(() => changeLocationMode = false);
   }
 
+  Future<void> _editZoneAlarms(ZoneRect zone) async {
+    final minTempCtrl = TextEditingController(
+      text: zone.minTemp?.toString() ?? '',
+    );
+    final maxTempCtrl = TextEditingController(
+      text: zone.maxTemp?.toString() ?? '',
+    );
+    final minHumCtrl = TextEditingController(
+      text: zone.minHum?.toString() ?? '',
+    );
+    final maxHumCtrl = TextEditingController(
+      text: zone.maxHum?.toString() ?? '',
+    );
+    final minLightCtrl = TextEditingController(
+      text: zone.minLight?.toString() ?? '',
+    );
+    final maxLightCtrl = TextEditingController(
+      text: zone.maxLight?.toString() ?? '',
+    );
+
+    final tempDelayCtrl = TextEditingController(
+      text: (zone.tempDelay ?? 1800).toString(),
+    );
+    final humDelayCtrl = TextEditingController(
+      text: (zone.humDelay ?? 1800).toString(),
+    );
+    final lightDelayCtrl = TextEditingController(
+      text: (zone.lightDelay ?? 1800).toString(),
+    );
+
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Alarmy: ${zone.name.isEmpty ? "Strefa" : zone.name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                Text(
+                  'Zone ID: ${zone.id}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Temperatura (°C)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                _numFiel('Minimalna temperatura:', minTempCtrl),
+                _numFiel('Maksymalna temperatura:', maxTempCtrl),
+                _numFieldInt('Opóżnienie alarmu w sekundach:', tempDelayCtrl),
+
+                const SizedBox(height: 12),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Wilgotność (%)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                _numFiel('Minimalna wilgotność:', minHumCtrl),
+                _numFiel('Maksymalna wilgotność:', maxHumCtrl),
+                _numFieldInt('Opóźnienie alarmu w sekundach:', humDelayCtrl),
+
+                const SizedBox(height: 12),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Światło (lx)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                _numFiel('Minimalne natężenie:', minLightCtrl),
+                _numFiel('Maksymalne natężenie:', maxLightCtrl),
+                _numFieldInt('Opóźnienie alarmu w sekundach:', lightDelayCtrl),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(context),
+              child: const Text('Anuluj'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setDialogState(() => saving = true);
+
+                      final payload = <String, dynamic>{
+                        'min_temp': _tryDoubleOrNull(minTempCtrl.text),
+                        'max_temp': _tryDoubleOrNull(maxTempCtrl.text),
+                        'min_hum': _tryDoubleOrNull(minHumCtrl.text),
+                        'max_hum': _tryDoubleOrNull(maxHumCtrl.text),
+                        'min_light': _tryDoubleOrNull(minLightCtrl.text),
+                        'max_light': _tryDoubleOrNull(maxLightCtrl.text),
+
+                        'temp_alarm_delay_seconds': _tryIntOrNull(
+                          tempDelayCtrl.text,
+                        ),
+                        'hum_alarm_delay_seconds': _tryIntOrNull(
+                          humDelayCtrl.text,
+                        ),
+                        'light_alarm_delay_seconds': _tryIntOrNull(
+                          lightDelayCtrl.text,
+                        ),
+                      };
+
+                      payload.removeWhere((k, v) => v == null);
+
+                      try {
+                        final ok = await ApiService().updateZoneAlarms(
+                          zone.id!,
+                          payload,
+                        );
+                        if (!ok) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Nie udało się zapisać alarmów'),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Zapisano alarmy strefy'),
+                            ),
+                          );
+                          await _fetchZones();
+                          Navigator.pop(context);
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(content: Text('Błąd zapisu: $e')),
+                        );
+                      } finally {
+                        setDialogState(() => saving = false);
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Zapisz'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double? _tryDoubleOrNull(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return null;
+    return double.tryParse(t.replaceAll(',', '.'));
+  }
+
+  int? _tryIntOrNull(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return null;
+    return int.tryParse(t);
+  }
+
+  Widget _numFiel(String label, TextEditingController c) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: TextField(
+        controller: c,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(labelText: label),
+      ),
+    );
+  }
+
+  Widget _numFieldInt(String label, TextEditingController c) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: TextField(
+        controller: c,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(labelText: label),
+      ),
+    );
+  }
+
   Future<void> _editSensor(SensorTile sensor) async {
     final nameCtrl = TextEditingController(text: sensor.name);
 
@@ -647,6 +870,25 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
       currentDrawing!.width = d.localPosition.dx - startDrag!.dx;
       currentDrawing!.height = d.localPosition.dy - startDrag!.dy;
     });
+  }
+
+  String _withUnit(dynamic value, String unit) {
+    if (value == null) return '-';
+
+    if (value is String) {
+      final s = value.trim();
+      final n = double.tryParse(s.replaceAll(',', '.'));
+      if (n != null) return '${n.toStringAsFixed(1)}$unit';
+      return '$s $unit';
+    }
+
+    if (value is num) {
+      final v = value.toDouble();
+      if (v == v.roundToDouble()) return '${v.toInt()}$unit';
+      return '${v.toStringAsFixed(1)}$unit';
+    }
+
+    return '$value $unit';
   }
 
   Future<void> _onZoneEnd(DragEndDetails d) async {
@@ -726,7 +968,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                   horizontal: 12,
                 ),
                 child: const Text(
-                  'Tryb edycji: \n- Dotknij obiektu, aby edytować parametry.\n- Przeciągnij, aby zmienić lokalizację.\n- Wciśnij kosz, aby usunąć obiekt.\n- Wciśnij ikonę ołówka, aby rysować nowe strefy.',
+                  'Tryb edycji: \n- Dotknij obiektu, aby edytować parametry.\n- Przeciągnij obiekt, aby zmienić jego lokalizację.\n- Wciśnij kosz, aby usunąć obiekt.\n- Wciśnij ołówek, aby edytować obiekt.\n- Wciśnij dzwonek, aby ustawić alarmy strefy.\n- Wciśnij ikonę ołówka w prawym dolnym rogu ekranu, aby rysować nowe strefy.',
                   style: TextStyle(
                     color: Colors.black87,
                     fontSize: 14,
@@ -820,30 +1062,57 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                   top: y,
                   width: width,
                   height: height,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  child: Stack(
                     children: [
                       if (editMode)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete,
-                                color: Colors.red,
-                                size: 20,
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
+                                onPressed: () => _deleteZone(z),
                               ),
-                              onPressed: () => _deleteZone(z),
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.edit,
-                                color: Colors.blue,
-                                size: 20,
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                                onPressed: () => _assignZoneToController(z),
                               ),
-                              onPressed: () => _assignZoneToController(z),
-                            ),
-                          ],
+
+                              IconButton(
+                                tooltip: 'Ustaw alarmy strefy',
+                                icon: Icon(
+                                  Icons.notifications,
+                                  size: 20,
+                                  color: z.alarmActive
+                                      ? Colors.red
+                                      : Colors.black54,
+                                ),
+                                onPressed: () {
+                                  if (z.id == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Strefa nie ma jeszcze ID. Zapisz strefę najpierw.',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  _editZoneAlarms(z);
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                     ],
                   ),
@@ -981,28 +1250,30 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                       if (sensor.temperature != null)
                         Text(
                           sensor.isExpanded
-                              ? 'Temperature: ${sensor.temperature}°C'
-                              : 'T: ${sensor.temperature}°C',
+                              ? "Temperatura: ${sensor.temperature}°C"
+                              : "T: ${_withUnit(sensor.temperature, '°C')}",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                           ),
                         ),
+
                       if (sensor.humidity != null)
                         Text(
                           sensor.isExpanded
-                              ? 'Humidity: ${sensor.humidity}%'
-                              : 'H: ${sensor.humidity}%',
+                              ? "Wilgotność: ${_withUnit(sensor.humidity, '%')}"
+                              : "W: ${_withUnit(sensor.humidity, '%')}",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                           ),
                         ),
+
                       if (sensor.light != null)
                         Text(
                           sensor.isExpanded
-                              ? 'Light: ${sensor.light}lx'
-                              : 'L: ${sensor.light}lx',
+                              ? "Światło: ${_withUnit(sensor.light, ' lx')}"
+                              : "Ś: ${_withUnit(sensor.light, ' lx')}",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -1120,58 +1391,63 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                       if (device.upTemp != null)
                         Text(
                           device.isExpanded || editMode
-                              ? 'T↑: ${device.upTemp}'
-                              : 'T↑: ${device.upTemp}',
+                              ? 'Temperatura wyłączenia: ${_withUnit(device.upTemp, ' °C')}'
+                              : 'T↑: ${_withUnit(device.upTemp, '°C')}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                           ),
                         ),
+
                       if (device.downTemp != null)
                         Text(
                           device.isExpanded || editMode
-                              ? 'T↓: ${device.downTemp}'
-                              : 'T↓: ${device.downTemp}',
+                              ? 'Temperatura włączenia: ${_withUnit(device.downTemp, ' °C')}'
+                              : 'T↓: ${_withUnit(device.downTemp, '°C')}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                           ),
                         ),
+
                       if (device.upHum != null)
                         Text(
                           device.isExpanded || editMode
-                              ? 'H↑: ${device.upHum}'
-                              : 'H↑: ${device.upHum}',
+                              ? 'Wilgotność wyłączenia: ${_withUnit(device.upHum, ' %')}'
+                              : 'W↑: ${_withUnit(device.upHum, '%')}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                           ),
                         ),
+
                       if (device.downHum != null)
                         Text(
                           device.isExpanded || editMode
-                              ? 'H↓: ${device.downHum}'
-                              : 'H↓: ${device.downHum}',
+                              ? 'Wilgotność włączenia: ${_withUnit(device.downHum, ' %')}'
+                              : 'W↓: ${_withUnit(device.downHum, '%')}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                           ),
                         ),
+
                       if (device.upLight != null)
                         Text(
                           device.isExpanded || editMode
-                              ? 'L↑: ${lightDisplay(device.upLight, device.upTemp, device.downTemp)}'
-                              : 'L↑: ${device.upLight}',
+                              ? 'Światło wyłączenia: ${_withUnit(device.upLight, ' lx')}'
+                              : 'Ś↑: ${_withUnit(device.upLight, ' lx')}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                           ),
                         ),
+
                       if (device.downLight != null)
                         Text(
                           device.isExpanded || editMode
-                              ? 'L↓: ${lightDisplay(device.downLight, device.upTemp, device.downTemp)}'
-                              : 'L↓: ${device.downLight}',
+                              ? 'Światło włączenia: ${_withUnit(device.downLight, ' lx')}'
+                              : 'Ś↓: ${_withUnit(device.downLight, ' lx')}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,

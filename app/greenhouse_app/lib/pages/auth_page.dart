@@ -34,32 +34,6 @@ class _AuthPageState extends State<AuthPage> {
     print('Register response: $response');
   }
 
-  // void login() async {
-  //   setState(() => loading = true);
-
-  //   try {
-  //     final user = await _authService.login(
-  //       emailController.text,
-  //       passwordController.text,
-  //     );
-
-  //     setState(() => loading = false);
-
-  //     if (user != null) {
-  //       Navigator.pushReplacement(
-  //         context,
-  //         MaterialPageRoute(builder: (_) => const HomePage()),
-  //       );
-  //     }
-  //   } catch (e) {
-  //     setState(() => loading = false);
-
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-  //     );
-  //   }
-  // }
-
   void login() async {
     setState(() => loading = true);
 
