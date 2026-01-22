@@ -301,70 +301,6 @@ router.post('/sensors/change-controller', isUserAuthenticated, async (req, res) 
 });
 
 
-
-  // router.get('/zones', isUserAuthenticated, async (req, res) => {
-  //   const greenhouseId = req.query.greenhouse_id;
-  //   if (!greenhouseId) return res.status(400).json({ message: 'greenhouse_id required' });
-
-  //   try {
-  //     const result = await db.query(`
-  //       SELECT 
-  //         z.id_zone,
-  //         z.zone_name,
-  //         z.id_greenhouse_controller,
-  //         gc.device_id AS controller_device_id,
-  //         z.id_greenhouse,
-  //         z.x,
-  //         z.y,
-  //         z.width,
-  //         z.height,
-  //         g.greenhouse_name,
-
-  //         (
-  //           zas.temp_alarm_active = TRUE
-  //           OR zas.hum_alarm_active = TRUE
-  //           OR zas.light_alarm_active = TRUE
-  //         ) AS alarm_active,
-
-  //         CASE
-  //           WHEN zas.temp_alarm_active AND (
-  //               (SELECT temperature FROM htl_logs hl
-  //                 JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
-  //                 WHERE sn.id_zone = z.id_zone
-  //                 ORDER BY hl.log_time DESC LIMIT 1) < z.min_temp
-  //           ) THEN 'Za niska temperatura'
-
-  //           WHEN zas.temp_alarm_active AND (
-  //               (SELECT temperature FROM htl_logs hl
-  //                 JOIN Sensor_nodes sn ON sn.id_sensor_node = hl.id_sensor_node
-  //                 WHERE sn.id_zone = z.id_zone
-  //                 ORDER BY hl.log_time DESC LIMIT 1) > z.max_temp
-  //           ) THEN 'Za wysoka temperatura'
-
-  //           WHEN zas.hum_alarm_active THEN 'Alarm wilgotności'
-  //           WHEN zas.light_alarm_active THEN 'Alarm światła'
-  //           ELSE NULL
-  //         END AS alarm_reason
-
-  //       FROM Zones z
-  //       LEFT JOIN Greenhouse_controllers gc
-  //         ON z.id_greenhouse_controller = gc.id_greenhouse_controller
-  //       JOIN Greenhouses g 
-  //         ON z.id_greenhouse = g.id_greenhouse
-  //       LEFT JOIN Zone_alarm_states zas
-  //         ON zas.id_zone = z.id_zone
-  //       WHERE z.id_greenhouse = $1 AND g.id_user = $2
-  //       ORDER BY z.id_zone;
-
-  //     `, [greenhouseId, req.session.user.id]);
-
-  //     res.json({ zones: result.rows });
-  //   } catch (err) {
-  //     console.error('Error fetching zones:', err);
-  //     res.status(500).json({ message: 'Server error' });
-  //   }
-  // });
-
 router.get('/zones', isUserAuthenticated, async (req, res) => {
   const greenhouseId = req.query.greenhouse_id;
   if (!greenhouseId) {
@@ -588,15 +524,6 @@ router.post('/greenhouses', isUserAuthenticated, async (req, res) => {
 });
 
 
-// router.get('/greenhouses', isUserAuthenticated, async (req, res) => {
-//   try {
-//     const result = await db.query('SELECT * FROM Greenhouses WHERE id_user = $1', [req.session.user.id]);
-//     res.json({ greenhouses: result.rows });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: 'Błąd serwera' });
-//   }
-// });
 
 router.get('/greenhouses', isUserAuthenticated, async (req, res) => {
   try {
@@ -1247,6 +1174,85 @@ router.post('/zones/:zoneId/config-alarms', isUserAuthenticated, async (req, res
     res.status(500).json({ message: 'Error updating config', error: err.message });
   }
 });
+
+
+router.get('/sensor-health-check', isUserAuthenticated, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+
+    const result = await db.query(
+      `
+      SELECT sensor_health_check_interval
+      FROM Users
+      WHERE id_user = $1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      sensor_health_check_interval:
+        result.rows[0].sensor_health_check_interval ?? 30,
+    });
+  } catch (err) {
+    console.error('Error fetching sensor health check interval:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/sensor-health-check', isUserAuthenticated, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const { sensor_health_check_interval } = req.body;
+
+    if (sensor_health_check_interval === undefined) {
+      return res
+        .status(400)
+        .json({ message: 'sensor_health_check_interval is required' });
+    }
+
+    const interval = parseInt(sensor_health_check_interval, 10);
+
+    if (!Number.isFinite(interval)) {
+      return res
+        .status(400)
+        .json({ message: 'sensor_health_check_interval must be a number' });
+    }
+
+    if (interval < 5 || interval > 86400) {
+      return res.status(400).json({
+        message:
+          'sensor_health_check_interval must be between 5 and 86400 seconds',
+      });
+    }
+
+    const result = await db.query(
+      `
+      UPDATE Users
+      SET sensor_health_check_interval = $1
+      WHERE id_user = $2
+      RETURNING sensor_health_check_interval
+      `,
+      [interval, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      message: 'Sensor health check interval updated',
+      sensor_health_check_interval: result.rows[0].sensor_health_check_interval,
+    });
+  } catch (err) {
+    console.error('Error updating sensor health check interval:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 
 
 module.exports = router;
