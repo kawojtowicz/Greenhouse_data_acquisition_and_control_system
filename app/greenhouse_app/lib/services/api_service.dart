@@ -14,9 +14,6 @@ import '../models/end_device.dart';
 class ApiService {
   final Dio dio = DioClient().dio;
   final String baseUrl = 'https://backend-floral-fog-9850.fly.dev';
-  // 'https://greenhouse-data-acquisition-and-control.onrender.com';
-  // 'http://192.168.0.101:3000';
-  // 'http://192.168.1.38:3000';
 
   Future<bool> logoutUser(BuildContext context) async {
     try {
