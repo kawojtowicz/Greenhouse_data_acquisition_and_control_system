@@ -470,7 +470,6 @@ router.get('/unassigned', isUserAuthenticated, async (req, res) => {
 //     res.status(500).json({ message: 'Server error' });
 //   }
 // });
-
 router.post('/assign', isUserAuthenticated, async (req, res) => {
   const { device_id, device_token } = req.body;
 
@@ -490,6 +489,10 @@ router.post('/assign', isUserAuthenticated, async (req, res) => {
       return res.status(400).json({ message: 'Device not available' });
     }
 
+    // 🔐 HASH TOKENA
+    const salt = await bcrypt.genSalt(10);
+    const deviceTokenHash = await bcrypt.hash(device_token, salt);
+
     await db.query(
       `
       UPDATE Greenhouse_controllers
@@ -497,18 +500,11 @@ router.post('/assign', isUserAuthenticated, async (req, res) => {
           device_token = $2
       WHERE device_id = $3
       `,
-      [req.session.user.id, device_token, device_id]
-    );
-
-    const token = jwt.sign(
-      { device_id, user_id: req.session.user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: '30d' }
+      [req.session.user.id, deviceTokenHash, device_id]
     );
 
     res.json({
-      message: 'Device assigned',
-      token
+      message: 'Device assigned'
     });
   } catch (err) {
     console.error(err);
