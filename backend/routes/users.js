@@ -452,48 +452,6 @@ router.get('/unassigned', isUserAuthenticated, async (req, res) => {
   }
 });
 
-
-// router.post('/assign', isUserAuthenticated, async (req, res) => {
-//   const { device_id, device_token } = req.body;
-
-//   if (!device_id || !device_token) {
-//     return res.status(400).json({
-//       message: 'device_id i device_token są wymagane'
-//     });
-//   }
-
-//   try {
-//     const deviceCheck = await db.query(
-//       'SELECT * FROM Greenhouse_controllers WHERE device_id = $1 AND id_user IS NULL',
-//       [device_id]
-//     );
-
-//     if (deviceCheck.rows.length === 0) {
-//       return res.status(400).json({ message: 'Device not available' });
-//     }
-
-//     const salt = await bcrypt.genSalt(10);
-//     const deviceTokenHash = await bcrypt.hash(device_token, salt);
-
-//     await db.query(
-//       `
-//       UPDATE Greenhouse_controllers
-//       SET id_user = $1,
-//           device_token = $2
-//       WHERE device_id = $3
-//       `,
-//       [req.session.user.id, deviceTokenHash, device_id]
-//     );
-
-//     res.json({
-//       message: 'Device assigned'
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// });
-
 router.post('/assign', isUserAuthenticated, async (req, res) => {
   const { device_id, device_token } = req.body;
 
@@ -504,33 +462,49 @@ router.post('/assign', isUserAuthenticated, async (req, res) => {
   }
 
   try {
-    const deviceCheck = await db.query(
-      'SELECT * FROM Greenhouse_controllers WHERE device_id = $1 AND id_user IS NULL',
+
+    const result = await db.query(
+      `
+      SELECT device_token
+      FROM Greenhouse_controllers
+      WHERE device_id = $1
+        AND id_user IS NULL
+      `,
       [device_id]
     );
 
-    if (deviceCheck.rows.length === 0) {
-      return res.status(400).json({ message: 'Device not available' });
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        message: 'Device not available or already assigned'
+      });
+    }
+
+    const storedToken = result.rows[0].device_token;
+
+    if (storedToken !== device_token) {
+      return res.status(401).json({
+        message: 'Invalid device token'
+      });
     }
 
     await db.query(
       `
       UPDATE Greenhouse_controllers
-      SET id_user = $1,
-          device_token = $2
-      WHERE device_id = $3
+      SET id_user = $1
+      WHERE device_id = $2
       `,
-      [req.session.user.id, device_token, device_id]
+      [req.session.user.id, device_id]
     );
 
     res.json({
-      message: 'Device assigned'
+      message: 'Device successfully assigned'
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 
 
