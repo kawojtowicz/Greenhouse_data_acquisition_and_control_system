@@ -1300,7 +1300,7 @@ router.get('/controllers', isUserAuthenticated, async (req, res) => {
   try {
     const result = await db.query(
       `
-      SELECT id, device_id
+      SELECT id_greenhouse_controller, device_id
       FROM Greenhouse_controllers
       WHERE id_user = $1
       `,
