@@ -465,19 +465,26 @@ router.post('/assign', isUserAuthenticated, async (req, res) => {
 
     const result = await db.query(
       `
-      SELECT device_token
-      FROM Greenhouse_controllers
-      WHERE device_id = $1
+      UPDATE Greenhouse_controllers
+      SET id_user = $1
+      WHERE device_id = $2
+        AND device_token = $3
         AND id_user IS NULL
+      RETURNING device_id
       `,
-      [device_id]
+      [req.session.user.id, device_id, device_token]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(400).json({
-        message: 'Device not available or already assigned'
+    if (result.rowCount === 0) {
+      return res.status(401).json({
+        message: 'Invalid device token or device already assigned'
       });
     }
+
+    res.json({
+      message: 'Device successfully assigned'
+    });
+
 
     const storedToken = result.rows[0].device_token;
 
@@ -1288,6 +1295,50 @@ router.post('/sensor-health-check', isUserAuthenticated, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+router.get('/controllers', isUserAuthenticated, async (req, res) => {
+  try {
+    const result = await db.query(
+      `
+      SELECT id, device_id
+      FROM Greenhouse_controllers
+      WHERE id_user = $1
+      `,
+      [req.session.user.id]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+router.delete('/controllers/:device_id', isUserAuthenticated, async (req, res) => {
+  const { device_id } = req.params;
+
+  try {
+    const result = await db.query(
+      `
+      UPDATE Greenhouse_controllers
+      SET id_user = NULL
+      WHERE device_id = $1 AND id_user = $2
+      `,
+      [device_id, req.session.user.id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Controller not found' });
+    }
+
+    res.json({ message: 'Controller removed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 
 
 
