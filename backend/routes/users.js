@@ -452,17 +452,74 @@ router.get('/unassigned', isUserAuthenticated, async (req, res) => {
   }
 });
 
+// router.post('/assign', isUserAuthenticated, async (req, res) => {
+//   const { device_id, device_token } = req.body;
+
+//   if (!device_id || !device_token) {
+//     return res.status(400).json({
+//       message: 'device_id i device_token są wymagane'
+//     });
+//   }
+
+//   try {
+
+//     const result = await db.query(
+//       `
+//       UPDATE Greenhouse_controllers
+//       SET id_user = $1
+//       WHERE device_id = $2
+//         AND device_token = $3
+//         AND id_user IS NULL
+//       RETURNING device_id
+//       `,
+//       [req.session.user.id, device_id, device_token]
+//     );
+
+//     if (result.rowCount === 0) {
+//       return res.status(401).json({
+//         message: 'Invalid device token or device already assigned'
+//       });
+//     }
+
+//     res.json({
+//       message: 'Device successfully assigned'
+//     });
+
+
+//     const storedToken = result.rows[0].device_token;
+
+//     if (storedToken !== device_token) {
+//       return res.status(401).json({
+//         message: 'Invalid device token'
+//       });
+//     }
+
+//     await db.query(
+//       `
+//       UPDATE Greenhouse_controllers
+//       SET id_user = $1
+//       WHERE device_id = $2
+//       `,
+//       [req.session.user.id, device_id]
+//     );
+
+//     res.json({
+//       message: 'Device successfully assigned'
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// });
+
 router.post('/assign', isUserAuthenticated, async (req, res) => {
   const { device_id, device_token } = req.body;
 
   if (!device_id || !device_token) {
-    return res.status(400).json({
-      message: 'device_id i device_token są wymagane'
-    });
+    return res.status(400).json({ message: 'device_id i device_token są wymagane' });
   }
 
   try {
-
     const result = await db.query(
       `
       UPDATE Greenhouse_controllers
@@ -481,36 +538,14 @@ router.post('/assign', isUserAuthenticated, async (req, res) => {
       });
     }
 
-    res.json({
-      message: 'Device successfully assigned'
-    });
+    res.json({ message: 'Device successfully assigned' });
 
-
-    const storedToken = result.rows[0].device_token;
-
-    if (storedToken !== device_token) {
-      return res.status(401).json({
-        message: 'Invalid device token'
-      });
-    }
-
-    await db.query(
-      `
-      UPDATE Greenhouse_controllers
-      SET id_user = $1
-      WHERE device_id = $2
-      `,
-      [req.session.user.id, device_id]
-    );
-
-    res.json({
-      message: 'Device successfully assigned'
-    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 
 
@@ -1323,7 +1358,7 @@ router.delete('/controllers/:device_id', isUserAuthenticated, async (req, res) =
       `
       UPDATE Greenhouse_controllers
       SET id_user = NULL
-      WHERE device_id = $1 AND id_user = $2
+      WHERE device_id = $1 AND id_user = $2   
       `,
       [device_id, req.session.user.id]
     );
