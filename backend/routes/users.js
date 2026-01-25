@@ -669,6 +669,46 @@ router.post('/sensors/assign-zone', isUserAuthenticated, async (req, res) => {
 });
 
 
+// router.post('/zones', isUserAuthenticated, async (req, res) => {
+//   const { zone_name, greenhouse_id, x, y, width, height } = req.body;
+
+//   if (!zone_name || !greenhouse_id) {
+//     return res.status(400).json({ message: 'zone_name i greenhouse_id są wymagane' });
+//   }
+
+//   try {
+//     const ghRes = await db.query('SELECT id_user FROM Greenhouses WHERE id_greenhouse = $1', [greenhouse_id]);
+
+//     if (ghRes.rows.length === 0) return res.status(404).json({ message: 'Szklarnia nie istnieje' });
+//     if (ghRes.rows[0].id_user !== req.session.user.id)
+//       return res.status(403).json({ message: 'Dostęp zabroniony: nie jesteś właścicielem szklarni' });
+
+//     const result = await db.query(`
+//       INSERT INTO Zones (zone_name, id_greenhouse, x, y, width, height, id_greenhouse_controller)
+//       VALUES ($1, $2, $3, $4, $5, $6, $7)
+//       RETURNING id_zone
+//     `, [zone_name, greenhouse_id, x ?? 50, y ?? 50, width ?? 50, height ?? 50, null]);
+
+//     res.status(201).json({
+//       message: 'Strefa utworzona',
+//       zone: {
+//         id_zone: result.rows[0].id_zone,
+//         zone_name,
+//         id_greenhouse: greenhouse_id,
+//         x: x ?? 50,
+//         y: y ?? 50,
+//         width: width ?? 50,
+//         height: height ?? 50,
+//         id_greenhouse_controller: null
+//       }
+//     });
+//   } catch (err) {
+//     console.error('Błąd tworzenia strefy:', err);
+//     res.status(500).json({ message: 'Błąd serwera' });
+//   }
+// });
+
+
 router.post('/zones', isUserAuthenticated, async (req, res) => {
   const { zone_name, greenhouse_id, x, y, width, height } = req.body;
 
@@ -676,23 +716,65 @@ router.post('/zones', isUserAuthenticated, async (req, res) => {
     return res.status(400).json({ message: 'zone_name i greenhouse_id są wymagane' });
   }
 
+  const client = await db.connect();
+
   try {
-    const ghRes = await db.query('SELECT id_user FROM Greenhouses WHERE id_greenhouse = $1', [greenhouse_id]);
+    await client.query('BEGIN');
 
-    if (ghRes.rows.length === 0) return res.status(404).json({ message: 'Szklarnia nie istnieje' });
-    if (ghRes.rows[0].id_user !== req.session.user.id)
-      return res.status(403).json({ message: 'Dostęp zabroniony: nie jesteś właścicielem szklarni' });
+    const ghRes = await client.query(
+      'SELECT id_user FROM Greenhouses WHERE id_greenhouse = $1',
+      [greenhouse_id]
+    );
 
-    const result = await db.query(`
-      INSERT INTO Zones (zone_name, id_greenhouse, x, y, width, height, id_greenhouse_controller)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    if (ghRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Szklarnia nie istnieje' });
+    }
+
+    if (ghRes.rows[0].id_user !== req.session.user.id) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ message: 'Dostęp zabroniony' });
+    }
+
+    const zoneRes = await client.query(
+      `
+      INSERT INTO Zones (
+        zone_name, id_greenhouse, x, y, width, height, id_greenhouse_controller
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, NULL)
       RETURNING id_zone
-    `, [zone_name, greenhouse_id, x ?? 50, y ?? 50, width ?? 50, height ?? 50, null]);
+      `,
+      [
+        zone_name,
+        greenhouse_id,
+        x ?? 50,
+        y ?? 50,
+        width ?? 50,
+        height ?? 50,
+      ]
+    );
+
+    const zoneId = zoneRes.rows[0].id_zone;
+
+    await client.query(
+      `
+      INSERT INTO Zone_alarm_states (
+        id_zone,
+        temp_alarm_active,
+        hum_alarm_active,
+        light_alarm_active
+      )
+      VALUES ($1, FALSE, FALSE, FALSE)
+      `,
+      [zoneId]
+    );
+
+    await client.query('COMMIT');
 
     res.status(201).json({
-      message: 'Strefa utworzona',
+      message: 'Strefa utworzona (alarmy nieaktywne)',
       zone: {
-        id_zone: result.rows[0].id_zone,
+        id_zone: zoneId,
         zone_name,
         id_greenhouse: greenhouse_id,
         x: x ?? 50,
@@ -702,11 +784,16 @@ router.post('/zones', isUserAuthenticated, async (req, res) => {
         id_greenhouse_controller: null
       }
     });
+
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Błąd tworzenia strefy:', err);
     res.status(500).json({ message: 'Błąd serwera' });
+  } finally {
+    client.release();
   }
 });
+
 
 
 router.get('/zones/all', isUserAuthenticated, async (req, res) => {
