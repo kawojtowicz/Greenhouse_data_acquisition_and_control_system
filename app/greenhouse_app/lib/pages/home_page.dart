@@ -69,6 +69,122 @@ class _HomePageState extends State<HomePage> {
       case 'logout':
         logout();
         break;
+      case 'my_controllers':
+        _showMyControllersView();
+        break;
+    }
+  }
+
+  void _showMyControllersView() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: FutureBuilder<List<dynamic>>(
+            future: api.fetchMyControllers(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return const Text('Błąd ładowania kontrolerów');
+              }
+
+              final controllers = snapshot.data ?? [];
+
+              if (controllers.isEmpty) {
+                return const SizedBox(
+                  height: 200,
+                  child: Center(child: Text('Brak przypisanych kontrolerów')),
+                );
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Moje kontrolery',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 12),
+
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: controllers.length,
+                      separatorBuilder: (_, __) => const Divider(),
+                      itemBuilder: (context, index) {
+                        final c = controllers[index];
+                        return ListTile(
+                          leading: const Icon(Icons.memory),
+                          title: Text('ID: ${c['device_id']}'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              final deviceId = c['device_id']?.toString();
+                              if (deviceId != null && deviceId.isNotEmpty) {
+                                _confirmDeleteController(deviceId);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Nieprawidłowy ID kontrolera',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteController(String controllerId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Usuń kontroler'),
+        content: const Text('Czy na pewno chcesz usunąć ten kontroler?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Anuluj'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Usuń'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await api.deleteController(controllerId);
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Kontroler usunięty')));
     }
   }
 
@@ -184,7 +300,7 @@ class _HomePageState extends State<HomePage> {
 
           return AlertDialog(
             title: const Text(
-              'Ustaw czas, po którym uruchami się alarm o bezczynności czujnika:',
+              'Ustaw czas, po którym uruchomi się alarm o bezczynności czujnika:',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
 
@@ -432,6 +548,15 @@ class _HomePageState extends State<HomePage> {
                   title: Text('Dodaj kontroler'),
                 ),
               ),
+
+              const PopupMenuItem(
+                value: 'my_controllers',
+                child: ListTile(
+                  leading: Icon(Icons.settings_remote),
+                  title: Text('Moje kontrolery'),
+                ),
+              ),
+
               const PopupMenuItem(
                 value: 'unassigned_devices',
                 child: ListTile(

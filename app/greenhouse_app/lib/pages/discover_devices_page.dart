@@ -19,20 +19,34 @@ class _DiscoverDevicesPageState extends State<DiscoverDevicesPage> {
     devicesFuture = api.fetchDiscoveredDevices();
   }
 
-  void assignDevice(String deviceId) async {
+  // void assignDevice(String deviceId) async {
+  //   try {
+  //     final token = await api.assignDevice(deviceId);
+  //     if (token != null) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Urządzenie przypisane i token zapisany!'),
+  //         ),
+  //       );
+  //     } else {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('Błąd przypisywania urządzenia')),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(
+  //       context,
+  //     ).showSnackBar(SnackBar(content: Text('Błąd: $e')));
+  //   }
+
+  //   setState(() {
+  //     devicesFuture = api.fetchDiscoveredDevices();
+  //   });
+  // }
+
+  Future<void> assignDevice(String deviceId, String deviceToken) async {
     try {
-      final token = await api.assignDevice(deviceId);
-      if (token != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Urządzenie przypisane i token zapisany!'),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Błąd przypisywania urządzenia')),
-        );
-      }
+      final token = await api.assignDevice(deviceId, deviceToken);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -42,6 +56,37 @@ class _DiscoverDevicesPageState extends State<DiscoverDevicesPage> {
     setState(() {
       devicesFuture = api.fetchDiscoveredDevices();
     });
+  }
+
+  void assignDeviceWithToken(String deviceId) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Podaj token urządzenia'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Token:'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Anuluj'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final token = controller.text.trim();
+              if (token.isEmpty) return;
+
+              Navigator.pop(context);
+              await assignDevice(deviceId, token);
+            },
+            child: const Text('Dodaj'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -78,7 +123,7 @@ class _DiscoverDevicesPageState extends State<DiscoverDevicesPage> {
                 trailing: device.assigned
                     ? const Icon(Icons.check, color: Colors.green)
                     : ElevatedButton(
-                        onPressed: () => assignDevice(device.deviceId),
+                        onPressed: () => assignDeviceWithToken(device.deviceId),
                         child: const Text('Dodaj'),
                       ),
               );

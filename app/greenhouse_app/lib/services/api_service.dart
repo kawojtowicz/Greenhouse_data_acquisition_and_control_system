@@ -13,7 +13,9 @@ import '../models/end_device.dart';
 
 class ApiService {
   final Dio dio = DioClient().dio;
-  final String baseUrl = 'https://backend-floral-fog-9850.fly.dev';
+  final String baseUrl =
+      // 'https://greenhouse-data-acquisition-and-control.onrender.com';
+      'https://backend-floral-fog-9850.fly.dev';
 
   Future<bool> logoutUser(BuildContext context) async {
     try {
@@ -146,13 +148,30 @@ class ApiService {
     return [];
   }
 
-  Future<String?> assignDevice(String deviceId) async {
+  // Future<String?> assignDevice(String deviceId) async {
+  //   try {
+  //     final response = await dio.post(
+  //       '$baseUrl/users/assign',
+  //       data: {'device_id': deviceId},
+  //       options: Options(headers: {'Content-Type': 'application/json'}),
+  //     );
+  //     if (response.statusCode == 200 && response.data['token'] != null) {
+  //       return response.data['token'];
+  //     }
+  //   } catch (e) {
+  //     print('assignDevice error: $e');
+  //   }
+  //   return null;
+  // }
+
+  Future<String?> assignDevice(String deviceId, String deviceToken) async {
     try {
       final response = await dio.post(
         '$baseUrl/users/assign',
-        data: {'device_id': deviceId},
+        data: {'device_id': deviceId, 'device_token': deviceToken},
         options: Options(headers: {'Content-Type': 'application/json'}),
       );
+
       if (response.statusCode == 200 && response.data['token'] != null) {
         return response.data['token'];
       }
@@ -576,6 +595,28 @@ class ApiService {
       throw Exception('Status: ${response.statusCode}');
     } catch (e) {
       print('updateSensorHealthCheckInterval error: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> fetchMyControllers() async {
+    try {
+      final res = await dio.get('$baseUrl/users/controllers');
+      return res.data;
+    } catch (e) {
+      print('fetchMyControllers error: $e');
+      throw Exception('Nie udało się pobrać kontrolerów');
+    }
+  }
+
+  Future<void> deleteController(dynamic deviceId) async {
+    try {
+      final res = await dio.delete('$baseUrl/users/controllers/$deviceId');
+      if (res.statusCode != 200) {
+        throw Exception('Status: ${res.statusCode}');
+      }
+    } catch (e) {
+      print('deleteController error: $e');
       rethrow;
     }
   }

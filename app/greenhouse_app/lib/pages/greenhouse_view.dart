@@ -657,7 +657,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
             child: Column(
               children: [
                 Text(
-                  'Zone ID: ${zone.id}',
+                  'ID strefy: ${zone.id}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
@@ -985,7 +985,7 @@ class _GreenhouseViewPageState extends State<GreenhouseViewPage> {
                   horizontal: 12,
                 ),
                 child: const Text(
-                  'Tryb rysowania nowej strefy: \n - Przeciągnij po mapie, aby zaznaczyć obszar.\n - Naciśnij ikonę ołówna ponownie, aby wyjść.',
+                  'Tryb rysowania nowej strefy: \n - Przeciągnij po mapie, aby zaznaczyć obszar.\n - Naciśnij ikonę ołówka ponownie, aby wyjść.',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
