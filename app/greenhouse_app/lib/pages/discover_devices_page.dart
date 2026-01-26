@@ -19,31 +19,6 @@ class _DiscoverDevicesPageState extends State<DiscoverDevicesPage> {
     devicesFuture = api.fetchDiscoveredDevices();
   }
 
-  // void assignDevice(String deviceId) async {
-  //   try {
-  //     final token = await api.assignDevice(deviceId);
-  //     if (token != null) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('Urządzenie przypisane i token zapisany!'),
-  //         ),
-  //       );
-  //     } else {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('Błąd przypisywania urządzenia')),
-  //       );
-  //     }
-  //   } catch (e) {
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(SnackBar(content: Text('Błąd: $e')));
-  //   }
-
-  //   setState(() {
-  //     devicesFuture = api.fetchDiscoveredDevices();
-  //   });
-  // }
-
   Future<void> assignDevice(String deviceId, String deviceToken) async {
     try {
       final token = await api.assignDevice(deviceId, deviceToken);

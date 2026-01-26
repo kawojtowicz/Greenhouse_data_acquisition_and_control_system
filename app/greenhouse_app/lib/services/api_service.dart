@@ -148,22 +148,6 @@ class ApiService {
     return [];
   }
 
-  // Future<String?> assignDevice(String deviceId) async {
-  //   try {
-  //     final response = await dio.post(
-  //       '$baseUrl/users/assign',
-  //       data: {'device_id': deviceId},
-  //       options: Options(headers: {'Content-Type': 'application/json'}),
-  //     );
-  //     if (response.statusCode == 200 && response.data['token'] != null) {
-  //       return response.data['token'];
-  //     }
-  //   } catch (e) {
-  //     print('assignDevice error: $e');
-  //   }
-  //   return null;
-  // }
-
   Future<String?> assignDevice(String deviceId, String deviceToken) async {
     try {
       final response = await dio.post(
