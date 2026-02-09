@@ -290,6 +290,8 @@ void *mainThread(void *arg0)
         }
         /* HUMIDITY MEASUREMENT */
 
+
+
         if (HDC2010_selection_flag == 1)
         {
             i2cTransaction.writeBuf = &hdcReg;
@@ -350,6 +352,10 @@ void *mainThread(void *arg0)
             i2cTransaction.writeCount   = 2;
             i2cTransaction.readBuf      = rxBuf;
             i2cTransaction.readCount    = 6;
+
+            I2C_transfer(i2c, &i2cTransaction);
+
+            ClockP_sleep(1);
 
             if (I2C_transfer(i2c, &i2cTransaction))
             {
